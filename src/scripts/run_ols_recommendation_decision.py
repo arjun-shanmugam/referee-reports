@@ -32,7 +32,7 @@ dataset.build_df(adjust_reports_with_papers=False,
                  restrict_to_papers_with_mixed_gender_referees=True)
 pd.reset_option("display.max_colwidth")
 print("REGRESSING Decision: Reject on Referee Gender")
-dataset.add_column(pd.get_dummies(dataset.df['_decision_'], prefix="Decision", drop_first=True, prefix_sep=": ").loc[:, 'Decision: Revise'])
+dataset.add_column(pd.get_dummies(dataset._df['_decision_'], prefix="Decision", drop_first=True, prefix_sep=": ").loc[:, 'Decision: Revise'])
 dataset.ols_regress(y='Decision: Revise',
                     X=['_female_'],
                     model_name="OLS Regression of Decision: Revise on Referee Gender",
@@ -42,7 +42,7 @@ dataset.ols_regress(y='Decision: Revise',
                     standardize=False)
 
 print("REGRESSING REFEREE GENDER ON RECOMMENDATION")
-recommendation_dummy_columns = pd.get_dummies(dataset.df['_recommendation_'], prefix="Recommendation", drop_first=True, prefix_sep=": ")
+recommendation_dummy_columns = pd.get_dummies(dataset._df['_recommendation_'], prefix="Recommendation", drop_first=True, prefix_sep=": ")
 for column in recommendation_dummy_columns:
     dataset.add_column(recommendation_dummy_columns[column])
     dataset.ols_regress(y=column,

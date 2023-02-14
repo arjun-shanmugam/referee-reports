@@ -6,96 +6,35 @@ Defines useful classes for reading and processing raw documents.
 import os
 import pickle
 from typing import List
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import pkldir
-from constants import NLPConstants
+from referee_reports.constants import NLPConstants
 from nltk.tokenize import word_tokenize
 
 
-class JournalDocReader:
-    """Defines text analysis functionality that is used by the PaperReader and ReportReader classes.
+class JournalDocumentReader:
+    _raw_pickled_documents: str
+    _df: pd.DataFrame
+    _cleaned_pickled_output: str
 
-    Defines functionality including repeated document analysis, optimal file format selection, depickling
-    and decoding of text, tokenizing and cleaning of text, and re-pickling of text.
-    """
-    path_to_pkl_documents: str
-    df: pd.DataFrame
-    path_to_intermediate_data: str
-    path_to_output: str
+    def __init__(self, raw_pickled_documents: str, cleaned_pickled_output: str):
+        self._raw_pickled_documents = raw_pickled_documents
+        self._df = pd.DataFrame()
+        self._cleaned_pickled_output = cleaned_pickled_output
 
-    def __init__(self, path_to_pkl_documents: str, path_to_intermediate_data: str, path_to_output: str):
-        self.path_to_pkl_documents = path_to_pkl_documents
-        self.df = pd.DataFrame()
-        self.path_to_intermediate_data = path_to_intermediate_data
-        self.path_to_output = path_to_output
+        self._validate_raw_data()
 
-    def analyze_repeated_documents(self, reports: bool):
-        """Produces pie charts giving summary statistics on the different file formats of documents in the sample.
+    def _validate_raw_data(self):
+        files = os.listdir(self._raw_pickled_documents)
 
-        Args:
-            reports (bool): Boolean indicating whether reports or papers are being analyzed.
-        """
-        files = os.listdir(self.path_to_pkl_documents)
+        # Raise error if raw pickled documents directory contains any subdirectories.
+        if any(os.path.isdir(os.path.join(self._raw_pickled_documents, file)) for file in files):
+            raise IsADirectoryError(f"{self._raw_pickled_documents} should contain only pickled documents, but it contains a sub-directory as well.")
 
-        # Warn user if directory contains directories as well as files.
-        nonfile_counter = 0
-        for file in files:
-            if not os.path.isfile(os.path.join(self.path_to_pkl_documents, file)):
-                nonfile_counter += 1
-        if nonfile_counter > 0:
-            print("WARNING: Data directory contains " + str(nonfile_counter) + " directories.")
-
-        # Separate filename from extension.
-        temp_df = pd.DataFrame()
-        temp_df['filename'] = files
-        temp_df['filename_without_extension'] = temp_df['filename'].str.split(pat='.').str[0]
-        temp_df['file_type'] = temp_df['filename'].str.split(pat='.').str[1]
-
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-
-        # Produce pie chart of counts of each document
-        paper_counts = pd.Series(temp_df.groupby('filename_without_extension').agg('count').groupby('file_type').agg('count')['filename'])
-        if reports:
-            title = "Number of Different \n File Types in Which \n Each Report Appears"
-        else:
-            title = "Number of Different \n File Types in Which \n Each Paper Appears"
-        paper_counts.plot(kind='pie',
-                          ax=ax1,
-                          title=title,
-                          ylabel="",
-                          autopct='%1.1f%%',
-                          explode=pd.Series(0.05, index=paper_counts.index))
-
-        # Produce pie chart of format distribution
-        if reports:
-            title = "Distribution of \n Best-Choice \n File Formats (Reports)"
-            filename = "filetype_analysis_reports.png"
-        else:
-            title = "Distribution of \n Best-Choice \n File Formats (Papers)"
-            filename = "filetype_analysis_papers.png"
-        file_type_counts = pd.Series(self.df['file_type'].value_counts())
-        file_type_counts.plot(kind='pie',
-                              ax=ax2,
-                              title="Distribution of \n Best-Choice \n File Formats",
-                              ylabel="",
-                              autopct='%1.1f%%',
-                              explode=pd.Series(0.05, index=file_type_counts.index))
-
-        plt.savefig(os.path.join(self.path_to_output, filename), bbox_inches='tight')
-
-    def _decode_text(self, text_encoding='UTF-8', preferred_formats=["pdf", "docx", "txt", "md"], paper=False):
-        files = os.listdir(self.path_to_pkl_documents)
-        files_to_decode = []
-
-        # Warn user if directory contains directories as well as files.
-        nonfile_counter = 0
-        for file in files:
-            if not os.path.isfile(os.path.join(self.path_to_pkl_documents, file)):
-                nonfile_counter += 1
-        if nonfile_counter > 0:
-            print("WARNING: Data directory contains " + str(nonfile_counter) + " directories.")
+    def _decode_text(self, text_encoding='UTF-8'):
+        # Get list of files to decode.
+        files = os.listdir(self._raw_pickled_documents)
 
         # Separate filename from extension.
         temp_df = pd.DataFrame()
@@ -104,22 +43,43 @@ class JournalDocReader:
         temp_df['file_type'] = temp_df['filename'].str.split(pat='.').str[1]
 
         # Select optimal format for reports which appear more than once.
-        self.df['filename'] = temp_df.groupby(['filename_without_extension']).apply(lambda x: self._choose_optimal_format(x, preferred_formats)).reset_index(
-            drop=True)
+        self._df['full_filename'] = files
+        self._df['filename_without_extension'] = self._df['full_filename'].str.split(pat='.', regex=False).str[0]
+        self._df['file_type'] = self._df['filename'].str.split(pat='.', regex=False).str[1]
+        self._df = self._df.groupby(['filename_without_extension']).apply(lambda x: self._choose_optimal_format(x))
+        self._df.index = self._df.index.rename("filename")
 
         # Append full file path to each filename and extract text.
-        self.df['folder'] = self.path_to_pkl_documents
-        self.df['filepath'] = self.df['folder'].str.cat(self.df['filename'])
-        self.df['bytes'] = self.df['filepath'].apply(lambda x: pkldir.decode(x))
-        self.df['text'] = self.df['bytes'].apply(lambda x: x.decode(text_encoding))
+        self._df['folder'] = self._raw_pickled_documents
+        self._df['filepath'] = self._df['folder'].str.cat(self._df['filename'])
+        self._df['bytes'] = self._df['filepath'].apply(lambda x: pkldir.decode(x))
+        self._df['text'] = self._df['bytes'].apply(lambda x: x.decode(text_encoding))
 
         # Check if any of the text strings are empty.
-        self.df['text'] = self.df['text'].replace({"": "THIS DOCUMENT IS EMPTY"})
+        self._df['text'] = self._df['text'].replace({"": "THIS DOCUMENT IS EMPTY"})
 
         # Drop empty documents
-        index_of_empty_documents = self.df.loc[self.df['text'] == "THIS DOCUMENT IS EMPTY"].index
-        self.df = self.df.drop(index=index_of_empty_documents)
+        index_of_empty_documents = self._df.loc[self._df['text'] == "THIS DOCUMENT IS EMPTY"].index
+        self._df = self._df.drop(index=index_of_empty_documents)
         print(str(len(index_of_empty_documents)) + " empty documents were found and dropped from the sample.")
+
+    def _choose_optimal_format(self, df):
+        """When applied to a groupby operation on a pandas DataFrame, choose the optimal file format
+        as specified in the parameter "ranking."
+        """
+        ordered_file_type_preferences = ["pdf", "docx", "txt", "md"]
+        for file_type in ordered_file_type_preferences:
+            # For each possible file type in order of preference, check if a row with that file type exists.
+            if df['file_type'].str.contains(file_type).any():
+                # If it does, return it. Otherwise, we check for the next best file type.
+                aggregated = df.loc[df['file_type'] == file_type, :].iloc[0].copy()
+                aggregated.name = None
+                return aggregated
+        # If none of the preferred file types exist in the 'file_type' column, raise an error.
+        print(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats. Check that all document formats are valid.")
+        raise FileNotFoundError(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats.")
+
+
 
     def _restrict_tokens(self, tokens: List[str], remove_stopwords):
         restricted_tokens = []
@@ -134,23 +94,23 @@ class JournalDocReader:
 
     def _tokenize_text(self, report: bool, remove_stopwords=False):
         # Remove all newlines.
-        self.df['text'] = self.df['text'].str.replace("\newline|\n", " ", regex=True)
+        self._df['text'] = self._df['text'].str.replace("\newline|\n", " ", regex=True)
 
         # Tokenize text using NLTK's recommended word tokenizer.
-        self.df['tokenized_text'] = self.df['text'].apply(lambda text: word_tokenize(text))
+        self._df['tokenized_text'] = self._df['text'].apply(lambda text: word_tokenize(text))
 
         # Re-combine backslashes with the words they preceed in case backslashes are split by the algorithm as separate tokens.
-        self.df['tokenized_text'] = self.df['tokenized_text'].apply(lambda tokens: self._mwe_retokenize(tokens, "\\"))
+        self._df['tokenized_text'] = self._df['tokenized_text'].apply(lambda tokens: self._mwe_retokenize(tokens, "\\"))
 
         # Remove tokens containing non-alphabetic characters.
         if remove_stopwords:
-            self.df['cleaned_text'] = self.df['tokenized_text'].apply(lambda tokens: self._restrict_tokens(tokens, remove_stopwords=True))
+            self._df['cleaned_text'] = self._df['tokenized_text'].apply(lambda tokens: self._restrict_tokens(tokens, remove_stopwords=True))
 
         else:
-            self.df['cleaned_text'] = self.df['tokenized_text'].apply(lambda tokens: self._restrict_tokens(tokens, remove_stopwords=False))
+            self._df['cleaned_text'] = self._df['tokenized_text'].apply(lambda tokens: self._restrict_tokens(tokens, remove_stopwords=False))
 
         # Plot histogram of document lengths.
-        self.df['cleaned_text_length'] = self.df['cleaned_text'].str.len()
+        self._df['cleaned_text_length'] = self._df['cleaned_text'].str.len()
         if report:
             title = "Report Lengths After All Cleaning"
             filepath = os.path.join(self.path_to_output, 'hist_words_report_lengths_after_all_cleaning.png')
@@ -172,16 +132,16 @@ class JournalDocReader:
 
             '''
 
-        plot_histogram(x=self.df['cleaned_text_length'],
+        plot_histogram(x=self._df['cleaned_text_length'],
                        filepath=filepath,
                        title=title,
                        xlabel=xlabel)
 
         # Join into one string of space-delimited tokens.
-        self.df['cleaned_text'] = self.df['cleaned_text'].str.join(" ").str.lower()
+        self._df['cleaned_text'] = self._df['cleaned_text'].str.join(" ").str.lower()
 
         # We no longer need the column giving length of cleaned text.
-        self.df = self.df.drop(columns='cleaned_text_length')
+        self._df = self._df.drop(columns='cleaned_text_length')
 
     def _mwe_retokenize(self, tokens, token_of_interest):
         """Retokenizes a list of tokens by combining every token equal to 'token_of_interest' with the following token.
@@ -214,38 +174,27 @@ class JournalDocReader:
 
         return retokenized_list
 
-    def _choose_optimal_format(self, df, file_type_ranking):
-        """When applied to a groupby operation on a pandas DataFrame, choose the optimal file format
-        as specified in the parameter "ranking."
-        """
 
-        for file_type in file_type_ranking:
-            # For each possible file type in order of preference, check if a row with that file type exists.
-            if len(df.loc[df['file_type'] == file_type]) > 0:
-                # If it does, return it. Otherwise, we check for the next best file type.
-                return df.loc[df['file_type'] == file_type]['filename'].iloc[0]
-        # If none of the preferred file types exist in the 'file_type' column, return this message.
-        return "This file does not exist in any of the specified file types."
 
     def _pickle_df(self, filename):
 
         # Momentarily save as an unpickled CSV.
-        unpickled_path = os.path.join(self.path_to_intermediate_data, filename)
-        self.df.to_csv(unpickled_path)
+        unpickled_path = os.path.join(self._cleaned_pickled_output, filename)
+        self._df.to_csv(unpickled_path)
 
         # Pickle CSV and save it.
-        pickled_path = os.path.join(self.path_to_intermediate_data, filename + ".pkl")
+        pickled_path = os.path.join(self._cleaned_pickled_output, filename + ".pkl")
         pickle.dump(pkldir.encode(unpickled_path), open(pickled_path, "wb"))
 
         # Delete unpickled CSV file.
         os.remove(unpickled_path)
 
 
-class PaperReader(JournalDocReader):
+class PaperReader(JournalDocumentReader):
     """The PaperReader class implements the functionality needed to extract features from the sample papers.
 
     Args:
-        JournalDocReader (JournalDocReader): The PaperReader inherits functionality from the JournalDocReader in cases where
+        JournalDocReader (JournalDocumentReader): The PaperReader inherits functionality from the JournalDocReader in cases where
                                              the same functionality needs to be applied to reports in addition to papers.
     """
 
@@ -262,7 +211,7 @@ class PaperReader(JournalDocReader):
 
         self._tokenize_text(remove_stopwords=True, report=False)
 
-        self.df = self.df.drop(columns=['folder'])
+        self.df = self._df.drop(columns=['folder'])
 
         # Extract paper number from filename as a separate column.
         split_filename_without_extension = self.df['filename'].str.split(pat='.').str[0].str.split(pat='-')
@@ -498,10 +447,10 @@ class PaperReader(JournalDocReader):
         return pd.Series(num_occurences_per_group), cutoff_sentence
 
 
-class ReportReader(JournalDocReader):
+class ReportReader(JournalDocumentReader):
 
-    def __init__(self, path_to_pkl_documents: str, path_to_intermediate_data: str, path_to_output: str, path_to_referee_characteristics: str):
-        JournalDocReader.__init__(self, path_to_pkl_documents, path_to_intermediate_data, path_to_output)
+    def __init__(self, raw_pickled_documents: str, cleaned_pickled_output: str, path_to_output: str, path_to_referee_characteristics: str):
+        JournalDocumentReader.__init__(self, raw_pickled_documents, cleaned_pickled_output, path_to_output)
         self.path_to_referee_characteristics = path_to_referee_characteristics
 
     def build_df(self):
@@ -511,7 +460,7 @@ class ReportReader(JournalDocReader):
 
         self._tokenize_text(remove_stopwords=True, report=True)
 
-        self.df = self.df.drop(columns=['folder'])
+        self.df = self._df.drop(columns=['folder'])
 
         # Extract referee number and paper number from filename as a separate column.
         paperid_refid_separated = self.df['filename'].str.split(pat='.').str[0].str.split(pat=' ref ')

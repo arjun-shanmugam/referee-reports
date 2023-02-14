@@ -30,6 +30,6 @@ dataset = RefereeReportDataset(path_to_pickled_reports=PICKLED_REPORTS,
 dataset.build_df(adjust_reports_with_papers=False,
                  normalize_documents_by_length=False,
                  restrict_to_papers_with_mixed_gender_referees=False)
-print(dataset.df['_paper_'].value_counts())
-print(len(dataset.df['_paper_'].value_counts()))
-print(len(dataset.df['_refnum_']))
+print(dataset._df['_paper_'].value_counts())
+print(len(dataset._df['_paper_'].value_counts()))
+print(len(dataset._df['_refnum_']))

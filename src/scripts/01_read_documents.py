@@ -18,13 +18,13 @@ else:
     RAW_PICKLED_REPORTS = "../../data/raw/reports-pkl"
     RAW_PICKLED_PAPERS = "../../data/raw/papers-pkl"
     REFEREE_CHARACTERISTICS = "../../data/raw/referee_gender_nonames.csv"
-INTERMEDIATE_DATA = "../../data/intermediate"
+CLEANED_PICKLED_OUTPUT = "../../data/intermediate"
 PREPROCESSING_OUTPUT = "../../output/preprocessing"
 
 # Read Reports===================================================================================================
 print("READING REPORTS")
-report_reader = ReportReader(path_to_pkl_documents=RAW_PICKLED_REPORTS,
-                             path_to_intermediate_data=INTERMEDIATE_DATA,
+report_reader = ReportReader(raw_pickled_documents=RAW_PICKLED_REPORTS,
+                             cleaned_pickled_output=CLEANED_PICKLED_OUTPUT,
                              path_to_output=PREPROCESSING_OUTPUT,
                              path_to_referee_characteristics=REFEREE_CHARACTERISTICS)
 report_reader.build_df()
@@ -35,8 +35,7 @@ print("\n\n\n\n")
 # Read Papers====================================================================================================
 print("READING PAPERS")
 paper_reader = PaperReader(RAW_PICKLED_PAPERS,
-                           INTERMEDIATE_DATA,
-                           PREPROCESSING_OUTPUT)
+                           CLEANED_PICKLED_OUTPUT)
 paper_reader.build_df()
 paper_reader.analyze_repeated_documents("filetype_analysis_papers.png")
 print("Done!")
