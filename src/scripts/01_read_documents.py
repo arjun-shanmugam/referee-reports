@@ -33,8 +33,8 @@ print("\n\n\n\n")
 
 # Read Reports===================================================================================================
 print("READING REPORTS")
-report_reader = ReportReader(raw_pickled_documents=RAW_PICKLED_REPORTS,
-                             cleaned_pickled_output=CLEANED_PICKLED_OUTPUT,
+report_reader = ReportReader(raw_pickled_documents_directory=RAW_PICKLED_REPORTS,
+                             cleaned_pickled_output_directory=CLEANED_PICKLED_OUTPUT,
                              path_to_output=PREPROCESSING_OUTPUT,
                              path_to_referee_characteristics=REFEREE_CHARACTERISTICS)
 report_reader.build_df()

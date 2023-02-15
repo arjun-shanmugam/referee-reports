@@ -9,26 +9,31 @@ from typing import List
 import matplotlib.pyplot as plt
 import pandas as pd
 import pkldir
+
+import referee_reports.document_readers
 from referee_reports.constants import NLPConstants
 from nltk.tokenize import word_tokenize
 
 
 class JournalDocumentReader:
-    _raw_pickled_documents: str
+    """
+    TODO
+    """
+    _raw_pickled_documents_directory: str
     _df: pd.DataFrame
-    _cleaned_pickled_output: str
+    _cleaned_pickled_output_directory: str
 
-    def __init__(self, raw_pickled_documents: str, cleaned_pickled_output: str):
-        self._raw_pickled_documents = raw_pickled_documents
+    def __init__(self, raw_pickled_documents_directory: str, cleaned_pickled_output_directory: str):
+        self._raw_pickled_documents_directory = raw_pickled_documents_directory
         self._df = pd.DataFrame()
-        self._cleaned_pickled_output = cleaned_pickled_output
+        self._cleaned_pickled_output_directory = cleaned_pickled_output_directory
 
     def _validate_raw_data(self):
-        files = os.listdir(self._raw_pickled_documents)
+        files = os.listdir(self._raw_pickled_documents_directory)
 
         # Raise error if raw pickled documents directory contains any subdirectories.
-        if any(os.path.isdir(os.path.join(self._raw_pickled_documents, file)) for file in files):
-            raise IsADirectoryError(f"{self._raw_pickled_documents} should contain only pickled documents, but it contains a sub-directory as well.")
+        if any(os.path.isdir(os.path.join(self._raw_pickled_documents_directory, file)) for file in files):
+            raise IsADirectoryError(f"{self._raw_pickled_documents_directory} should contain only pickled documents, but it contains a sub-directory as well.")
 
         self._df['full_filename'] = files
 
@@ -43,9 +48,8 @@ class JournalDocumentReader:
                     aggregated.name = None
                     return aggregated
             # If none of the preferred file types exist in the 'file_type' column, raise an error.
-            print(
-                f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats. Check that all document formats are valid.")
-            raise FileNotFoundError(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats.")
+            raise FileNotFoundError(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats."
+                                    "Check that all document formats are valid.")
 
         # Select optimal format for reports which appear more than once.
         self._df['filename_without_extension'] = self._df['full_filename'].str.split(pat='.', regex=False).str[0]
@@ -56,14 +60,14 @@ class JournalDocumentReader:
 
     def _decode_text(self, text_encoding='UTF-8'):
         # Extract text.
-        filepaths = pd.Series(self._raw_pickled_documents, index=self._df.index).str.cat(self._df['full_filename'])
+        filepaths = pd.Series(self._raw_pickled_documents_directory, index=self._df.index).str.cat(self._df['full_filename'])
         bytes_ = filepaths.apply(lambda x: pkldir.decode(x))
         self._df['raw_text'] = bytes_.apply(lambda x: x.decode(text_encoding))
 
         # Check if any of the text strings are empty.
-        self._df['raw_text'] = self._df['text'].fillna("")
+        self._df['raw_text'] = self._df['raw_text'].fillna("")
         if (self._df['raw_text'].str.len() <= 100).any():
-            empty_documents = self._df.loc[self._df['text'] == "", :].index.tolist()
+            empty_documents = self._df.loc[self._df['raw_text'] == "", :].index.tolist()
             message = ",".join(empty_documents)
             raise UnicodeError(
                 f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.")
@@ -104,26 +108,33 @@ class JournalDocumentReader:
                                     .str.join(" ").str.lower()  # Join into one string of space-delimited tokens.
                                     )
 
-    def _pickle_df(self, filename):
-        print(self._df.columns)
+    def _pickle_df(self):
+        if type(self) == referee_reports.document_readers.PaperReader:
+            filename = "papers.txt"
+        elif type(self) == referee_reports.document_readers.ReportReader:
+            filename = "reports.txt"
+        elif type(self) == referee_reports.document_readers.JournalDocumentReader:  # For testing purposes only.
+            filename = "journal_documents.txt"
+        else:
+            raise NotImplementedError("The method _pickle_df was called by an object of an unrecognized class, and cannot automatically name the cleaned,"
+                                      "pickled output file. See the method definition in referee_reports.document_readers.JournalDocumentReader.")
+
         # Momentarily save as an unpickled CSV.
-        unpickled_path = os.path.join(self._cleaned_pickled_output, filename)
+        unpickled_path = os.path.join(self._cleaned_pickled_output_directory, filename)
         self._df.to_csv(unpickled_path)
 
         # Pickle CSV and save it.
-        pickled_path = os.path.join(self._cleaned_pickled_output, filename + ".pkl")
-        pickle.dump(pkldir.encode(unpickled_path), open(pickled_path, "wb"))
+        pickled_path = os.path.join(self._cleaned_pickled_output_directory, filename + '.pkl')
+        with open(pickled_path, "wb") as file:
+            pickle.dump(pkldir.encode(unpickled_path), file)
 
         # Delete unpickled CSV file.
         os.remove(unpickled_path)
 
 
 class PaperReader(JournalDocumentReader):
-    """The PaperReader class implements the functionality needed to extract features from the sample papers.
-
-    Args:
-        JournalDocReader (JournalDocumentReader): The PaperReader inherits functionality from the JournalDocReader in cases where
-                                             the same functionality needs to be applied to reports in addition to papers.
+    """
+    TODO
     """
 
     def build_df(self):  # TODO: FINISH THIS METHOD
@@ -381,8 +392,8 @@ class PaperReader(JournalDocumentReader):
 
 class ReportReader(JournalDocumentReader):
 
-    def __init__(self, raw_pickled_documents: str, cleaned_pickled_output: str, path_to_output: str, path_to_referee_characteristics: str):
-        JournalDocumentReader.__init__(self, raw_pickled_documents, cleaned_pickled_output, path_to_output)
+    def __init__(self, raw_pickled_documents_directory: str, cleaned_pickled_output_directory: str, path_to_output: str, path_to_referee_characteristics: str):
+        JournalDocumentReader.__init__(self, raw_pickled_documents_directory, cleaned_pickled_output_directory, path_to_output)
         self.path_to_referee_characteristics = path_to_referee_characteristics
 
     def build_df(self):
