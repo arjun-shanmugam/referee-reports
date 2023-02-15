@@ -23,8 +23,6 @@ class JournalDocumentReader:
         self._df = pd.DataFrame()
         self._cleaned_pickled_output = cleaned_pickled_output
 
-        self._validate_raw_data()
-
     def _validate_raw_data(self):
         files = os.listdir(self._raw_pickled_documents)
 
@@ -32,152 +30,82 @@ class JournalDocumentReader:
         if any(os.path.isdir(os.path.join(self._raw_pickled_documents, file)) for file in files):
             raise IsADirectoryError(f"{self._raw_pickled_documents} should contain only pickled documents, but it contains a sub-directory as well.")
 
-    def _decode_text(self, text_encoding='UTF-8'):
-        # Get list of files to decode.
-        files = os.listdir(self._raw_pickled_documents)
+        self._df['full_filename'] = files
 
-        # Separate filename from extension.
-        temp_df = pd.DataFrame()
-        temp_df['filename'] = files
-        temp_df['filename_without_extension'] = temp_df['filename'].str.split(pat='.').str[0]
-        temp_df['file_type'] = temp_df['filename'].str.split(pat='.').str[1]
+    def _filter_duplicate_documents(self):
+        def _choose_optimal_format(df):
+            ordered_file_type_preferences = ["pdf", "docx", "txt", "md"]
+            for file_type in ordered_file_type_preferences:
+                # For each possible file type in order of preference, check if a row with that file type exists.
+                if df['file_type'].str.contains(file_type).any():
+                    # If it does, return it. Otherwise, we check for the next best file type.
+                    aggregated = df.loc[df['file_type'] == file_type, :].iloc[0].copy()
+                    aggregated.name = None
+                    return aggregated
+            # If none of the preferred file types exist in the 'file_type' column, raise an error.
+            print(
+                f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats. Check that all document formats are valid.")
+            raise FileNotFoundError(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats.")
 
         # Select optimal format for reports which appear more than once.
-        self._df['full_filename'] = files
         self._df['filename_without_extension'] = self._df['full_filename'].str.split(pat='.', regex=False).str[0]
-        self._df['file_type'] = self._df['filename'].str.split(pat='.', regex=False).str[1]
-        self._df = self._df.groupby(['filename_without_extension']).apply(lambda x: self._choose_optimal_format(x))
-        self._df.index = self._df.index.rename("filename")
+        self._df['file_type'] = self._df['full_filename'].str.split(pat='.', regex=False).str[1]
+        self._df = self._df.groupby(['filename_without_extension']).apply(lambda x: _choose_optimal_format(x))['full_filename']
+        self._df.index = self._df.index.rename("paper")
+        self._df = pd.DataFrame(self._df)
 
-        # Append full file path to each filename and extract text.
-        self._df['folder'] = self._raw_pickled_documents
-        self._df['filepath'] = self._df['folder'].str.cat(self._df['filename'])
-        self._df['bytes'] = self._df['filepath'].apply(lambda x: pkldir.decode(x))
-        self._df['text'] = self._df['bytes'].apply(lambda x: x.decode(text_encoding))
+    def _decode_text(self, text_encoding='UTF-8'):
+        # Extract text.
+        filepaths = pd.Series(self._raw_pickled_documents, index=self._df.index).str.cat(self._df['full_filename'])
+        bytes_ = filepaths.apply(lambda x: pkldir.decode(x))
+        self._df['raw_text'] = bytes_.apply(lambda x: x.decode(text_encoding))
 
         # Check if any of the text strings are empty.
-        self._df['text'] = self._df['text'].replace({"": "THIS DOCUMENT IS EMPTY"})
+        self._df['raw_text'] = self._df['text'].fillna("")
+        if (self._df['raw_text'].str.len() <= 100).any():
+            empty_documents = self._df.loc[self._df['text'] == "", :].index.tolist()
+            message = ",".join(empty_documents)
+            raise UnicodeError(
+                f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.")
 
-        # Drop empty documents
-        index_of_empty_documents = self._df.loc[self._df['text'] == "THIS DOCUMENT IS EMPTY"].index
-        self._df = self._df.drop(index=index_of_empty_documents)
-        print(str(len(index_of_empty_documents)) + " empty documents were found and dropped from the sample.")
+    def _tokenize_text(self):
+        def _mwe_retokenize(tokens, token_of_interest):
+            retokenized_list = []
+            i = 0
+            tokens_enum = enumerate(tokens)
+            for i, current_token in tokens_enum:
+                if current_token == token_of_interest and i < len(tokens) - 1:
+                    index = i
+                    next_token = tokens[i + 1]
+                    current_token_retokenized = current_token
+                    while next_token == token_of_interest and index < len(tokens):
+                        next(tokens_enum)
+                    if index < len(tokens) - 1:
+                        current_token_retokenized = current_token_retokenized + next_token
+                        current_token = next(tokens_enum)
+                    retokenized_list.append(current_token_retokenized)
+                else:
+                    retokenized_list.append(current_token)
+            return retokenized_list
 
-    def _choose_optimal_format(self, df):
-        """When applied to a groupby operation on a pandas DataFrame, choose the optimal file format
-        as specified in the parameter "ranking."
-        """
-        ordered_file_type_preferences = ["pdf", "docx", "txt", "md"]
-        for file_type in ordered_file_type_preferences:
-            # For each possible file type in order of preference, check if a row with that file type exists.
-            if df['file_type'].str.contains(file_type).any():
-                # If it does, return it. Otherwise, we check for the next best file type.
-                aggregated = df.loc[df['file_type'] == file_type, :].iloc[0].copy()
-                aggregated.name = None
-                return aggregated
-        # If none of the preferred file types exist in the 'file_type' column, raise an error.
-        print(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats. Check that all document formats are valid.")
-        raise FileNotFoundError(f"Document {df.loc[0, 'full_filename'].split('.')[0]} not found in .pdf, .docx, .txt, or .md formats.")
-
-
-
-    def _restrict_tokens(self, tokens: List[str], remove_stopwords):
-        restricted_tokens = []
-        for token in tokens:
-            if remove_stopwords:
+        def _restrict_tokens(tokens: List[str]):  # TODO
+            restricted_tokens = []
+            for token in tokens:
                 if token.isalpha() and len(token) > 2 and token.lower() not in NLPConstants.NLTK_STOPWORDS_ENGLISH:
                     restricted_tokens.append(token)
-            else:
-                if token.isalpha() and len(token) > 2:
-                    restricted_tokens.append(token)
-        return restricted_tokens
+            return restricted_tokens
 
-    def _tokenize_text(self, report: bool, remove_stopwords=False):
-        # Remove all newlines.
-        self._df['text'] = self._df['text'].str.replace("\newline|\n", " ", regex=True)
-
-        # Tokenize text using NLTK's recommended word tokenizer.
-        self._df['tokenized_text'] = self._df['text'].apply(lambda text: word_tokenize(text))
-
-        # Re-combine backslashes with the words they preceed in case backslashes are split by the algorithm as separate tokens.
-        self._df['tokenized_text'] = self._df['tokenized_text'].apply(lambda tokens: self._mwe_retokenize(tokens, "\\"))
-
-        # Remove tokens containing non-alphabetic characters.
-        if remove_stopwords:
-            self._df['cleaned_text'] = self._df['tokenized_text'].apply(lambda tokens: self._restrict_tokens(tokens, remove_stopwords=True))
-
-        else:
-            self._df['cleaned_text'] = self._df['tokenized_text'].apply(lambda tokens: self._restrict_tokens(tokens, remove_stopwords=False))
-
-        # Plot histogram of document lengths.
-        self._df['cleaned_text_length'] = self._df['cleaned_text'].str.len()
-        if report:
-            title = "Report Lengths After All Cleaning"
-            filepath = os.path.join(self.path_to_output, 'hist_words_report_lengths_after_all_cleaning.png')
-            xlabel = '''Length of Report (Words)
-
-            Note: This figure is a histogram of the number of tokens in the sample reports after removing all non-alphabetic tokens,
-            tokens less than three characters in length, and stopwords, just before the document term matrix for reports is created.
-            Low frequency tokens have not yet been removed. 
-            '''
-        else:
-            title = "Paper Lengths After All Cleaning"
-            filepath = os.path.join(self.path_to_output, 'hist_words_paper_length_after_all_cleaning.png')
-            xlabel = '''Length of Paper (Words)
-
-            Note: This figure is a histogram of the number of tokens in the sample papers after the removal of the Journal of Public
-            Economics cover pages, restriction to paper introductions, removal of thank yous, removal of non-alphabetic tokens,
-            removal of tokens less than 3 characters in length, and removal of stopwords. Equivalently, this figure is built using
-            paper lengths just before the document term matrix for papers is created. Low frequency tokens have not yet been removed.
-
-            '''
-
-        plot_histogram(x=self._df['cleaned_text_length'],
-                       filepath=filepath,
-                       title=title,
-                       xlabel=xlabel)
-
-        # Join into one string of space-delimited tokens.
-        self._df['cleaned_text'] = self._df['cleaned_text'].str.join(" ").str.lower()
-
-        # We no longer need the column giving length of cleaned text.
-        self._df = self._df.drop(columns='cleaned_text_length')
-
-    def _mwe_retokenize(self, tokens, token_of_interest):
-        """Retokenizes a list of tokens by combining every token equal to 'token_of_interest' with the following token.
-        """
-
-        retokenized_list = []
-        i = 0
-        tokens_enum = enumerate(tokens)
-        for i, current_token in tokens_enum:
-            # print("CURRENT TOKEN: " + current_token + "| INDEX="+str(i))
-
-            if current_token == token_of_interest and i < len(tokens) - 1:
-
-                index = i
-                next_token = tokens[i + 1]
-                current_token_retokenized = current_token
-                # print("\tCHECKING FOR TOKENS OF INTEREST IN THE IMMEDIATELY FOLLOWING TOKENS")
-                while next_token == token_of_interest and index < len(tokens):
-                    next(tokens_enum)
-
-                if index < len(tokens) - 1:
-                    # print("\tCONCATENATING WITH NEXT TOKEN, " + next_token + " WHICH IS NOT A TOKEN OF INTEREST")
-                    current_token_retokenized = current_token_retokenized + next_token
-                    current_token = next(tokens_enum)
-                retokenized_list.append(current_token_retokenized)
-            else:
-                retokenized_list.append(current_token)
-
-            # print("------------------------------------------------")
-
-        return retokenized_list
-
-
+        self._df['cleaned_text'] = (self._df['raw_text']
+                                    .str.replace("\newline|\n", " ", regex=True)  # Remove all newlines.
+                                    .apply(lambda text: word_tokenize(text))  # Tokenize text using NLTK's recommended word tokenizer.
+                                    # Re-combine backslashes in case backslashes are split by the algorithm as separate tokens.
+                                    .apply(lambda tokens: _mwe_retokenize(tokens, "\\"))
+                                    .apply(lambda tokens: _restrict_tokens(tokens))  # Remove tokens containing non-alphabetic characters and stopwords.
+                                    .str.join(" ").str.lower()  # Join into one string of space-delimited tokens.
+                                    )
 
     def _pickle_df(self, filename):
-
+        print(self._df.columns)
         # Momentarily save as an unpickled CSV.
         unpickled_path = os.path.join(self._cleaned_pickled_output, filename)
         self._df.to_csv(unpickled_path)
@@ -198,10 +126,14 @@ class PaperReader(JournalDocumentReader):
                                              the same functionality needs to be applied to reports in addition to papers.
     """
 
-    def build_df(self):
+    def build_df(self):  # TODO: FINISH THIS METHOD
         """Builds a pandas DataFrame containing the text and ID of each paper."""
 
+        self._validate_raw_data()
+        self._filter_duplicate_documents()
         self._decode_text()
+
+        # TODO: Below
 
         self._remove_jpub_e_cover_page()
 
@@ -481,4 +413,3 @@ class ReportReader(JournalDocumentReader):
         # Save all columns to pickled CSV.
         self.df = self.df.drop(columns=['tokenized_text', 'filename', 'filepath', 'bytes', 'text'])
         self._pickle_df('reports.txt')
-
