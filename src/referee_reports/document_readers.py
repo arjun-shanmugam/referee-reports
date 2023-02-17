@@ -254,40 +254,6 @@ class PaperReader(JournalDocumentReader):
             restricted_sentences.append(sentences[:int(cutoff)])
         self._df['raw_text'] = pd.Series(restricted_sentences, index=self._df.index).str.join(" ")
 
-
-
-    def _remove_thank_yous(self, keywords: List[str] = ['thanks',
-                                                        'thank',
-                                                        'manuscript',
-                                                        'indebted',
-                                                        'comments',
-                                                        'discussion',
-                                                        'NBER',
-                                                        'excellent',
-                                                        'research assistance',
-                                                        'helpful',
-                                                        'expressed in this paper',
-                                                        'errors',
-                                                        'disclaimer',
-                                                        'grant',
-                                                        '@']):
-        """Attempt to remove thank you sections from each paper.
-
-        Args:
-            keywords (List[str], optional): _description_. Defaults to a list of keywords which commonly appear in paper thank you sections.
-        """
-        # Split string by "\n\n".
-        split_by_double_newline = self.df['text'].str.split(pat="\n\n")
-
-        # Get the string with the most occurrences of keywords in the splitted list. This is the thank you's section of intro.
-        thank_yous = split_by_double_newline.apply(lambda strings: self._get_string_with_most_occurrences(strings=strings,
-                                                                                                          keywords=keywords))
-        num_failures = len(thank_yous.loc[thank_yous == "This string is not present in the paper. Returning it so that no text is erroneously deleted."])
-        print("Could not algorithmically remove thank yous and author contact information from " + str(num_failures) + " papers.")
-        introductions_without_thank_yous = [text.replace(thank_you, "") for text, thank_you in zip(self.df['text'], thank_yous)]
-
-        self.df['text'] = introductions_without_thank_yous
-
     def _get_string_with_most_occurrences(self, strings: List[str], keywords: List[str]):
         """A helper function which returns the string in a list of strings which contains the most occurrences of specified keywords.
 
