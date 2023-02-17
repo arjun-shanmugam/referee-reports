@@ -5,6 +5,7 @@ Defines useful classes for reading and processing raw documents.
 """
 import os
 import pickle
+import re
 from typing import List
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -12,7 +13,7 @@ import pkldir
 
 import referee_reports.document_readers
 from referee_reports.constants import NLPConstants
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import sent_tokenize, word_tokenize
 
 
 class JournalDocumentReader:
@@ -69,7 +70,7 @@ class JournalDocumentReader:
         if (self._df['raw_text'].str.len() <= 100).any():
             empty_documents = self._df.loc[self._df['raw_text'] == "", :].index.tolist()
             message = ",".join(empty_documents)
-            raise UnicodeError(
+            raise MalformedDocumentError(
                 f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.")
 
     def _tokenize_text(self):
@@ -132,6 +133,10 @@ class JournalDocumentReader:
         os.remove(unpickled_path)
 
 
+class MalformedDocumentError(Exception):
+    """TODO"""
+
+
 class PaperReader(JournalDocumentReader):
     """
     TODO
@@ -143,10 +148,9 @@ class PaperReader(JournalDocumentReader):
         self._validate_raw_data()
         self._filter_duplicate_documents()
         self._decode_text()
+        self._remove_jpube_cover_pages()
 
         # TODO: Below
-
-        self._remove_jpub_e_cover_page()
 
         self._restrict_to_intro()
 
@@ -173,35 +177,84 @@ class PaperReader(JournalDocumentReader):
         # Save all columns to a pickled CSV.
         self._pickle_df('papers.txt')
 
-    def _remove_jpub_e_cover_page_helper(self, text_of_paper: str):
-        """Remove the Journal of Public Economics cover page from each paper.
+    def _remove_jpube_cover_pages(self):
+        def _remove_jpube_cover_page_from_single_paper(row, split_on):
+            if split_on.lower() in row['raw_text'].lower():
+                # Use regex module to split so that we can do so case-insensitively (we will lowercase the string during tokenization, not here).
+                split = re.split(split_on, row['raw_text'], flags=re.IGNORECASE)
+                raw_text_without_cover_page = "".join(split[1:])
+                return pd.Series([row['full_filename'], raw_text_without_cover_page])
+            else:
+                raise MalformedDocumentError(f"Could not separate JPUBE cover page from paper {row.name}. Check that the JPUBE cover page is "
+                                             f"separated from the text of this manuscript by the phrase \"Click here to view linked References\" "
+                                             f"(any combination of uppercase or lowercase).")
 
-        This method is meant to be passed to a pd.Series.apply() to remove
-        the JPubE cover pages from each paper. Cover pages are removed
-        by splitting documents on the string "1\n2\n...\n65".
+        # Case-insensitively split text on the phrase "click here to view linked references" (taken from 97-hendren.pdf)
+        text_to_split_on = "click here to view linked references"
+        self._df = self._df.apply(lambda row: _remove_jpube_cover_page_from_single_paper(row, text_to_split_on),
+                                  axis=1,
+                                  result_type='broadcast')
 
-        Args:
-            text_of_paper (str): The text of the paper from which to remove the cover page.
-
-        Returns:
-            str: The text of the paper after removing its cover page or the original text of
-                 the paper if the cover page could not be removed.
+    def _restrict_to_intro(self):
+        """Restrict the papers in the sample solely to their introductions.
         """
-        # Split paper's text on the first appearace of line numbers.
-        text_to_split_on = "\n".join([str(num) for num in range(1, 66)])
-        if text_to_split_on in text_of_paper:
-            split = text_of_paper.split(text_to_split_on)
-            # Remove text before the first appearance of line numbers; rejoin
-            return "".join(split[1:])
-        else:
-            print("Could not separate Journal of Public Economics cover page from rest of paper.")
-            return text_of_paper
+        # Tokenize into sentences.
+        sentence_tokenized_papers = self._df['raw_text'].apply(lambda text: sent_tokenize(text))
 
-    def _remove_jpub_e_cover_page(self):
-        """Applies the _remove_jpub_e_cover_page_helper() function to the text of each paper.
-        """
-        # Case-sensitively split text on the word 'Introduction'
-        self.df['text'] = self.df['text'].apply(lambda text_of_paper: self._remove_jpub_e_cover_page_helper(text_of_paper))
+        def _estimate_intro_boundary(ungrouped_sentences: List[str], group_size: int, minimum_count: int, word: str):
+            """
+           TODO: Rewrite
+
+            Case-insensitively calculates the number of occurences of 'word' in every unique consecutive group of 'group size' sentences.
+
+                Returns a tuple containing:
+                    -a Series giving the number of occurences in each sentence group
+                    -the index of the last sentence in the first sentence group which has the specified number of occurrences.
+            """
+            # Store number of sentences in paper.
+            num_sentences = len(ungrouped_sentences)
+
+            # List to store number of occurences in each sentence group.
+            num_occurences_per_group = []
+
+            # To store the index of the last sentence in the first sentence group which contains enough uses of the word of interest.
+            cutoff_sentence = float("-inf")
+
+            # Loop through sentences, calculating occurrences in each sentence group.
+            for i in range(num_sentences):
+                count = 0
+                # Continue to next iteration of loop if there are fewer remaining sentences than the group size.
+                if num_sentences - i < group_size:
+                    continue
+                # Check the current sentence and the next <group_size> sentences for occurrences of the word of interest.
+                for sentence in ungrouped_sentences[i: i + group_size]:
+                    if word.lower() in sentence.lower():
+                        # count = count + sentence.lower().count(word.lower())
+                        if word.lower() in sentence.lower():
+                            count += 1
+                num_occurences_per_group.append(count)
+                # Store the index of the last sentence in the first sentence group which contains enough uses of the word of interest.
+                if count >= minimum_count and cutoff_sentence == float("-inf"):
+                    cutoff_sentence = i + group_size
+            return cutoff_sentence
+
+        # Count occurrences of the word "section" in each consecutive group of three sentences.
+        cutoffs = sentence_tokenized_papers.apply(lambda list_of_sentences: _estimate_intro_boundary(list_of_sentences,
+                                                                                                     group_size=3,
+                                                                                                     minimum_count=2,
+                                                                                                     word="section"))
+        # This Series equals -inf for papers where no cutoff could be found. Replace those cutoffs with the total number of sentences in the paper.
+        cutoffs = cutoffs.where(cutoffs != float("-inf"), sentence_tokenized_papers.str.len())
+        # Dummy indicating whether a cutoff could be found.
+        self._df['cutoff_found'] = (cutoffs != sentence_tokenized_papers.str.len())  # If cutoff is different from the length of the paper, a cutoff was found.
+
+        # Restrict each paper to only sentences preceding the cutoff sentence.
+        restricted_sentences = []
+        for sentences, cutoff in zip(sentence_tokenized_papers, cutoffs):
+            restricted_sentences.append(sentences[:int(cutoff)])
+        self._df['raw_text'] = pd.Series(restricted_sentences, index=self._df.index).str.join(" ")
+
+
 
     def _remove_thank_yous(self, keywords: List[str] = ['thanks',
                                                         'thank',
@@ -274,120 +327,6 @@ class PaperReader(JournalDocumentReader):
             return "This string is not present in the paper. Returning it so that no text is erroneously deleted."
 
         return strings[index_of_string_with_most_occurrences]
-
-    def _restrict_to_intro(self):
-        """Restrict the papers in the sample solely to their introductions.
-        """
-        # Tokenize into sentences.
-        self.df['sentence_tokenized_text'] = self.df['text'].apply(lambda text: sent_tokenize(text))
-
-        # Count occurences of the word "section" in each consecutive group of three sentences.
-        counts_and_cutoff = self.df['sentence_tokenized_text'].apply(lambda sentences: self._get_count_per_group_of_sentences_helper(sentences))
-        uses_over_groups = pd.concat(counts_and_cutoff.str[0].values, axis=1).fillna(0).mean(axis=1)  # Average across papers.
-
-        plot_line(x=uses_over_groups.index[:500],
-                  y=uses_over_groups.values[:500],
-                  filepath=os.path.join(self.path_to_output, 'uses_of_section_over_sentence_groups.png'),
-                  title="Mean Number Of Occurences of \"Section\" Across Papers",
-                  xlabel="Sentence Group Number",
-                  ylabel="Mean Number of Occurrences")
-
-        # Store cutoff sentences for introduction.
-        self.df['cutoff'] = counts_and_cutoff.str[1]
-
-        # Calculate each cutoff as portion of paper.
-        indices_where_a_cutoff_found_algorithmically_ = self.df['cutoff'].loc[self.df['cutoff'] != float("-inf")].index
-        cutoffs_as_portion_of_paper = (self.df['cutoff'].loc[indices_where_a_cutoff_found_algorithmically_] /
-                                       self.df['sentence_tokenized_text'].loc[indices_where_a_cutoff_found_algorithmically_].str.len()
-                                       )
-
-        # When introduction length as portion of total length is an outlier, replace with median introduction length as portion of total length.
-        median_cutoff_as_portion_of_paper = cutoffs_as_portion_of_paper.median()
-        q25 = cutoffs_as_portion_of_paper.quantile(0.25)
-        q75 = cutoffs_as_portion_of_paper.quantile(0.75)
-        iqr = q75 - q25  # Since paper lengths are right-skewed, use IQR to find outliers.
-        outlier_indices = cutoffs_as_portion_of_paper.loc[
-            (cutoffs_as_portion_of_paper <= (q25 - 1.5 * iqr)) | ((q75 + 1.5 * iqr) <= cutoffs_as_portion_of_paper)].index
-        outlier_total_paper_lengths = self.df['sentence_tokenized_text'].loc[outlier_indices].str.len()
-        self.df.loc[outlier_indices, 'cutoff'] = median_cutoff_as_portion_of_paper * outlier_total_paper_lengths
-        print("Algorithmically derived introduction cutoffs are outliers for " + str(
-            outlier_indices.size) + " papers. Setting their introduction cutoffs to median of paper length-normalized cutoffs.")
-
-        # When we cannot algorithmically derive a cutoff, set cutoff to the median cutoff among papers for which we can.
-        cutoff_not_found_indices = self.df['cutoff'].loc[self.df['cutoff'] == float("-inf")].index
-        cutoff_not_found_total_paper_lengths = self.df['sentence_tokenized_text'].loc[cutoff_not_found_indices].str.len()
-        self.df.loc[cutoff_not_found_indices, 'cutoff'] = median_cutoff_as_portion_of_paper * cutoff_not_found_total_paper_lengths
-        print("Could not algorithmically separate the introductions of " + str(
-            cutoff_not_found_indices.size) + " papers. Setting their introduction cutoffs to median of paper length-normalized cutoffs.")
-
-        # Restrict each paper to only sentences preceeding the cutoff sentence.
-        restricted_sentences = []
-        for sentences, cutoff in zip(self.df['sentence_tokenized_text'], self.df['cutoff']):
-            restricted_sentences.append(sentences[:int(cutoff)])
-
-        # Store sentences comprising introduction as a column.
-        self.df['introduction_sentences'] = restricted_sentences
-
-        # Plot histogram of introduction lengths.
-        self.df['introduction_length'] = self.df['introduction_sentences'].str.len()
-        xlabel = '''Length (Sentences)
-
-            Note: This figure is a histogram of the number of sentences in the sample papers after removing the cover pages and restricting
-              to the introductions. Non-alphabetic tokens, tokens less than three characters in length, and stopwords have yet to be
-              removed at this point.
-                    '''
-        title = "Paper Length Immediately After Restriction"
-        filepath = os.path.join(self.path_to_output, 'hist_sentences_per_paper_after_restriction_before_tokenization.png')
-        plot_histogram(x=self.df['introduction_length'], filepath=filepath, title=title, xlabel=xlabel)
-
-        # Plot histogram of introduction lengths divided by total lengths.
-        introduction_lengths_as_portion_of_paper_lengths = self.df['introduction_length'] / self.df['sentence_tokenized_text'].str.len()
-        xlabel = '''Length (Sentences, As a Portion of Total Sentences In Paper)
-
-        Note: This figure is a histogram of the number of sentences in the sample papers after removing the cover pages and restricting
-              to the introductions. Non-alphabetic tokens, tokens less than three characters in length, and stopwords have yet to be
-              removed at this point. All sentence counts were divided by the total number of sentences in the original paper. 
-                    '''
-        title = "Paper Length Immediately After Restriction as a Portion of Original Paper Length"
-        filepath = os.path.join(self.path_to_output, 'hist_sentences_per_paper_normalized_after_restriction_before_tokenization.png')
-        plot_histogram(x=introduction_lengths_as_portion_of_paper_lengths, filepath=filepath, title=title, xlabel=xlabel, decimal_places=3)
-
-        # Reset the 'text' column to contain only text from paper introductions.
-        self.df['text'] = self.df['introduction_sentences'].str.join(" ")
-
-    def _get_count_per_group_of_sentences_helper(self, ungrouped_sentences, group_size=3, minimum_count=2, word="section"):
-        """Case-insensitively calculates the number of occurences of 'word' in every unique consecutive group of 'group size' sentences.
-
-            Returns a tuple containing:
-                -a Series giving the number of occurences in each sentence group
-                -the index of the last sentence in the first sentence group which has the specified number of occurrences.
-        """
-        # Store number of sentences in paper.
-        num_sentences = len(ungrouped_sentences)
-
-        # List to store number of occurences in each sentence group.
-        num_occurences_per_group = []
-
-        # To store the index of the last sentence in the first sentence group which contains enough uses of the word of interest.
-        cutoff_sentence = float("-inf")
-
-        # Loop through sentences, calculating occurences in each sentence group.
-        for i in range(num_sentences):
-            count = 0
-            # Continue to next iteration of loop if there are fewer remaining sentences than the group size.
-            if num_sentences - i < group_size:
-                continue
-            # Check the current sentence and the next <group_size> sentences for occurrences of the word of interest.
-            for sentence in ungrouped_sentences[i: i + group_size]:
-                if word.lower() in sentence.lower():
-                    # count = count + sentence.lower().count(word.lower())
-                    if word.lower() in sentence.lower():
-                        count += 1
-            num_occurences_per_group.append(count)
-            # Store the index of the last sentence in the first sentence group which contains enough uses of the word of interest.
-            if count >= minimum_count and cutoff_sentence == float("-inf"):
-                cutoff_sentence = i + group_size
-        return pd.Series(num_occurences_per_group), cutoff_sentence
 
 
 class ReportReader(JournalDocumentReader):

@@ -1,8 +1,4 @@
-"""Tests JournalDocReader functionality.
-"""
-import io
-
-from referee_reports.document_readers import JournalDocumentReader
+from referee_reports.document_readers import JournalDocumentReader, MalformedDocumentError
 import os
 from io import StringIO
 import pandas as pd
@@ -50,7 +46,7 @@ def test__decode_text(journal_document_reader):
     journal_document_reader = JournalDocumentReader("../../data/test_assets/empty_documents-pkl/", "")
     journal_document_reader._validate_raw_data()
     journal_document_reader._filter_duplicate_documents()
-    with pytest.raises(UnicodeError):
+    with pytest.raises(MalformedDocumentError):
         journal_document_reader._decode_text()
 
 
@@ -75,7 +71,7 @@ def test__pickle_df(journal_document_reader):
     journal_document_reader._decode_text()
     journal_document_reader._tokenize_text()
     journal_document_reader._pickle_df()
-    actual = pd.read_csv(io.StringIO(pkldir.decode("../../data/test_assets/pickled_cleaned_test_data/journal_documents.txt.pkl").decode('utf-8')),
+    actual = pd.read_csv(StringIO(pkldir.decode("../../data/test_assets/pickled_cleaned_test_data/journal_documents.txt.pkl").decode('utf-8')),
                          index_col='paper')
     expected = journal_document_reader._df
     pd.testing.assert_frame_equal(actual, expected)
