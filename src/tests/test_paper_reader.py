@@ -8,10 +8,13 @@ def paper_reader():
     paper_reader = PaperReader("../../data/raw/papers-pkl/", "../../data/intermediate/")
     paper_reader._validate_raw_data()
     paper_reader._filter_duplicate_documents()
+    paper_reader._format_index()
     paper_reader._decode_text()
     return paper_reader
 
 def test__remove_jpube_cover_pages(paper_reader):
+    print("\n\n\n")
+    print(paper_reader._df)
     paper_reader._remove_jpube_cover_pages()
     assert not paper_reader._df['raw_text'].str.contains("Elsevier Editorial System").any()  # Test that text does not contain "Elsevier Editorial System"
 
@@ -62,6 +65,3 @@ def test__restrict_to_intro(paper_reader):
     expected = pd.DataFrame.from_dict({'full_filename': full_filename, 'raw_text': raw_text, 'cutoff_found': cutoff_found})
     expected.index = index
     pd.testing.assert_frame_equal(actual, expected)
-
-def test__remove_thank_yous(paper_reader):
-

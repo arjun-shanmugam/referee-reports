@@ -18,36 +18,45 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
-from stargazer.stargazer import Stargazer
-
-from constants import OI_constants, OutputTableConstants
-from figure_utils import (plot_hist, plot_histogram, plot_pie, plot_pie_by,
-                          plot_scatter)
-from likelihood_ratio_model import LikelihoodRatioModel
-from ols_regression import OLSRegression
-from regularized_regression import RegularizedRegression
+# from stargazer.stargazer import Stargazer
+#
+# from constants import OI_constants, OutputTableConstants
+# from figure_utils import (plot_hist, plot_histogram, plot_pie, plot_pie_by,
+#                           plot_scatter)
+# from likelihood_ratio_model import LikelihoodRatioModel
+# from ols_regression import OLSRegression
+# from regularized_regression import RegularizedRegression
 
 
 class RefereeReportDataset:
     """Builds a DataFrame at the report-level containing report,
     referee, and paper data. Allows the user to run statistical models for text analysis.
     """
+    _df: pd.DataFrame
+    _reports_df: pd.DataFrame
+    _papers_df: pd.DataFrame
+    _output_directory: str
+    _seed: int
+    _ngrams: int
 
-    def __init__(self, path_to_pickled_reports: str, path_to_pickled_papers: str, path_to_output: str, seed: int):
+    def __init__(self, cleaned_pickled_reports_file: str, cleaned_pickled_papers_file: str, output_directory: str, seed: int):
         """Instantiates a RefereeReportDataset object.
 
         Args:
-            path_to_pickled_reports (str): _description_
-            path_to_pickled_papers (str): _description_
-            path_to_output (str): _description_
+            cleaned_pickled_reports_file (str): _description_
+            cleaned_pickled_papers_file (str): _description_
+            output_directory (str): _description_
             seed (int): _description_
         """
+        self._df = pd.DataFrame()
+        self._reports_df = pd.read_csv(io.StringIO(pkldir.decode(cleaned_pickled_reports_file).decode('utf-8')),
+                                       index_col=['paper', 'refnum'])
+        self._papers_df = pd.read_csv(io.StringIO(pkldir.decode(cleaned_pickled_papers_file).decode('utf-8')),
+                                      index_col='paper')
+        self._output_directory = output_directory
+        self._seed = seed
+        np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
 
-        self.report_df = pd.read_csv(io.StringIO(pkldir.decode(path_to_pickled_reports).decode('utf-8')))
-        self.paper_df = pd.read_csv(io.StringIO(pkldir.decode(path_to_pickled_papers).decode('utf-8')))
-        self.df = pd.DataFrame()
-        self.path_to_output = path_to_output
-        self.seed = seed
         self.report_dtm = pd.DataFrame()
         self.report_vocabulary = []
         self.tf_reports = pd.DataFrame()
@@ -56,39 +65,70 @@ class RefereeReportDataset:
         self.models = {}
         self.ngrams = None
 
-        np.random.seed(self.seed)  # Must set internal seed to ensure reproducible output from sklearn.
+    def build_df(self, text_representation: str, ngrams: int, restrict_to_mixed_gender_referees: bool):
+
+        self._format_non_vocabulary_columns()
+        self._build_dtm(text_representation)
+
+    def _format_non_vocabulary_columns(self):
+        self._reports_df.columns = [f"_{column}_" for column in self._reports_df.columns]
+        self._papers_df.columns = [f"_{column}_" for column in self._papers_df.columns]
+
+    def _build_dtm(self, text_representation: str, ngrams: int):
+        # Fit a CountVectorizer to the reports.
+        vectorizer = CountVectorizer(ngram_range=(ngrams, ngrams))
+        vectorizer = vectorizer.fit(self._reports_df['_cleaned_text_'])
+
+        # Build the D.T.M. appropriately.
+        if text_representation == 'R':
+            dtm = vectorizer.transform(self._reports_df['_cleaned_text_']).toarray()
+        elif text_representation == 'NR':
+            dtm = vectorizer.transform(self._reports_df['_cleaned_text_']).toarray()
+            report_lengths = dtm.sum(axis=1)
+            dtm = pd.DataFrame(dtm).div(pd.Series(report_lengths), axis=0)
+            dtm = dtm.values
+        elif text_representation == 'R-tilde':
+            raise NotImplementedError("TODO: Implement R-tilde.")
+        elif text_representation == 'NR/NP':
+            raise NotImplementedError("TODO: Implement NR/NP.")
+        else:
+            raise ValueError("The argument text_representation to referee_report_dataset.build_df() must be either \"R\", \"NR\", \"R-tilde\", \"NR/NP\", ")
+
+        # Concatenate DTM with the rest of the data.
+        dtm = pd.DataFrame(dtm, self._reports_df.index, columns=vectorizer.get_feature_names_out())
+        self._df = pd.concat([self._reports_df, dtm], axis=1)
+
+
 
     def build_df(self,
                  adjust_reports_with_papers: bool,
-                 normalize_documents_by_length:bool,
+                 normalize_documents_by_length: bool,
                  restrict_to_papers_with_mixed_gender_referees: bool,
-                 balance_sample_by_categorical_column: str=None,
-                 ngrams: int=1,
-                 min_df:int=1,
-                 max_df:float=1.0):
+                 balance_sample_by_categorical_column: str = None,
+                 ngrams: int = 1,
+                 min_df: int = 1,
+                 max_df: float = 1.0):
         self.ngrams = ngrams
 
         # Merge paper characteristics and referee characteristics.
-        self.df = self.report_df.merge(self.paper_df,
-                                                       how='inner',
-                                                       left_on='paper',
-                                                       right_on='paper',
-                                                       suffixes=('_report', '_paper'),
-                                                       validate='m:1')
-        self.df = self.df.drop(columns=['Unnamed: 0_report', 'Unnamed: 0_paper'])   
-        
+        self._df = self.report_df.merge(self.paper_df,
+                                        how='inner',
+                                        left_on='paper',
+                                        right_on='paper',
+                                        suffixes=('_report', '_paper'),
+                                        validate='m:1')
+        self._df = self._df.drop(columns=['Unnamed: 0_report', 'Unnamed: 0_paper'])
+
         # Add names to columns not indicating word counts so that they can be differentiated from word count variables. 
-        for column in self.df.columns:
-            self.df = self.df.rename(columns={column: "_" + column + "_"})
+        for column in self._df.columns:
+            self._df = self._df.rename(columns={column: "_" + column + "_"})
 
         # Drop unneeded columnns. 
-        self.df = self.df.drop(columns=['_file_type_report_', '_file_type_paper_'])
-
+        self._df = self._df.drop(columns=['_file_type_report_', '_file_type_paper_'])
 
         # Save paper ID, referee ID, recommendation, and decision as categorical data.
         for column in ['_paper_', '_refnum_', '_recommendation_', '_decision_']:
-            self.df[column] = self.df[column].astype('category')
-
+            self._df[column] = self._df[column].astype('category')
 
         if restrict_to_papers_with_mixed_gender_referees:
             self._restrict_to_papers_with_mixed_gender_referees()
@@ -97,24 +137,24 @@ class RefereeReportDataset:
                                 ngrams=ngrams,
                                 min_df=min_df,
                                 max_df=max_df,
-                                normalize_documents_by_length=normalize_documents_by_length) 
-        
-        
+                                normalize_documents_by_length=normalize_documents_by_length)
+
         if balance_sample_by_categorical_column != None:
             self._balance_sample_by_categorical_column(balance_sample_by_categorical_column)
 
     def _balance_sample_by_categorical_column(self, column_to_balance):
         # Get unique values and their counts for the column to balance on.
-        value_counts = self.df[column_to_balance].value_counts()
+        value_counts = self._df[column_to_balance].value_counts()
 
         # Warn if provided column appears continuous.                                            
         if len(value_counts) > 6:
             warnings.warn("There are more than 6 unique values of the provided column. Are you sure that it is categorical?")
-        
+
         # Check that each class appears frequently enough for us to balance observations by column.
         minimum_count = value_counts.min()
-        if minimum_count < 1/(2 * len(value_counts)) * len(self.df):
-            warnings.warn("The specified column contains a class which account for a small percentage of total observations. Balancing by this class would hugely reduce sample size.")
+        if minimum_count < 1 / (2 * len(value_counts)) * len(self._df):
+            warnings.warn(
+                "The specified column contains a class which account for a small percentage of total observations. Balancing by this class would hugely reduce sample size.")
         # Balance observations.
         for index, count in value_counts.iteritems():
             # No need to drop observations which come from the lowest-frequency class. 
@@ -123,45 +163,41 @@ class RefereeReportDataset:
             imbalance = count - minimum_count
             # We want to draw n random rows, where n is equal to the difference between the count of the current value
             # and the count of the least-frequent value.
-            oversampled_rows = self.df.loc[self.df[column_to_balance] == index]
+            oversampled_rows = self._df.loc[self._df[column_to_balance] == index]
             num_rows_dropped = 0
             # Choose rows to drop within-paper groups at random.
-            papers = self.df['_paper_'].value_counts().index.tolist()
-            random.Random(self.seed).shuffle(papers)
+            papers = self._df['_paper_'].value_counts().index.tolist()
+            random.Random(self._seed).shuffle(papers)
             for paper in cycle(papers):
                 current_paper_rows = oversampled_rows.loc[oversampled_rows['_paper_'] == paper]
                 if len(current_paper_rows) < 2:  # Do not drop oversampled row if it is the only one within its paper group.
                     continue
                 else:
-                    random_row_index = current_paper_rows.sample(n=1, random_state=self.seed).index
-                    self.df = self.df.drop(index=random_row_index)
+                    random_row_index = current_paper_rows.sample(n=1, random_state=self._seed).index
+                    self._df = self._df.drop(index=random_row_index)
                     num_rows_dropped += 1
                 if num_rows_dropped == imbalance:
                     break  # Break out of this loop and consider the next oversampled category.
 
-        self.df = self.df.reset_index(drop=True)
+        self._df = self._df.reset_index(drop=True)
 
-    def print_non_privileged_columns(self):
-        """Print non-sensitive data to console. 
-        """
-        print(self.df[['_paper_', '_refnum_', '_recommendation_', '_decision_', '_female_']])          
 
     def _build_tf_matrices(self, adjust_reports_with_papers, ngrams, min_df, max_df, normalize_documents_by_length=False):
         # Fit a CountVectorizer to the reports.
         vectorizer = CountVectorizer(min_df=min_df, max_df=max_df, ngram_range=(ngrams, ngrams))
-        vectorizer = vectorizer.fit(self.df['_cleaned_text_report_'])
+        vectorizer = vectorizer.fit(self._df['_cleaned_text_report_'])
 
         # Store CountVectorizer's vocabulary.
-        self.report_vocabulary = list(vectorizer.get_feature_names())  # NOTE: The version of Scikit-learn installed on this machine is old. In new versions, .get_feature_names() has been deprecated.
+        self.report_vocabulary = list(
+            vectorizer.get_feature_names())  # NOTE: The version of Scikit-learn installed on this machine is old. In new versions, .get_feature_names() has been deprecated.
 
         # Transform the reports and the papers into their T.F.V. representations.
-        self.tf_reports = vectorizer.transform(self.df['_cleaned_text_report_']).toarray()
-        self.tf_papers = vectorizer.transform(self.df['_cleaned_text_paper_']).toarray()
+        self.tf_reports = vectorizer.transform(self._df['_cleaned_text_report_']).toarray()
+        self.tf_papers = vectorizer.transform(self._df['_cleaned_text_paper_']).toarray()
 
-    
         # Convert the T.F.V. to DataFrames.
-        self.tf_reports = pd.DataFrame(self.tf_reports, index=self.df.index, columns=self.report_vocabulary)
-        self.tf_papers = pd.DataFrame(self.tf_papers, index=self.df.index, columns=self.report_vocabulary)
+        self.tf_reports = pd.DataFrame(self.tf_reports, index=self._df.index, columns=self.report_vocabulary)
+        self.tf_papers = pd.DataFrame(self.tf_papers, index=self._df.index, columns=self.report_vocabulary)
 
         # Normalize documents by length if specified.
         if normalize_documents_by_length:
@@ -178,13 +214,13 @@ class RefereeReportDataset:
                 self.tf_reports_adjusted = self.tf_reports / self.tf_papers
 
                 # Produce final DataFrame by concatenating normalized, paper-adjusted report frequencies with other data.
-                self.df = pd.concat([self.df, self.tf_reports_adjusted], axis=1)
+                self._df = pd.concat([self._df, self.tf_reports_adjusted], axis=1)
             else:
                 report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
                 self.tf_reports = self.tf_reports.div(report_lengths, axis=0)
 
                 # Produce final DataFrame by concatenating normalized report frequencies with other data.
-                self.df = pd.concat([self.df, self.tf_reports], axis=1)
+                self._df = pd.concat([self._df, self.tf_reports], axis=1)
 
         else:
             if adjust_reports_with_papers:
@@ -194,25 +230,23 @@ class RefereeReportDataset:
                 # Negative values indicate that a word does not appear in the report, but does appear in the corresponding paper.
                 # Replace with 0.
                 self.tf_reports_adjusted[self.tf_reports_adjusted < 0] = 0
-                
+
                 # Concatenate paper-adjusted wordcounts with other data.
-                self.df = pd.concat([self.df, self.tf_reports_adjusted], axis=1)
+                self._df = pd.concat([self._df, self.tf_reports_adjusted], axis=1)
             else:
                 # Concatenate report word counts with other data.
-                self.df = pd.concat([self.df, self.tf_reports], axis=1)
-
-
+                self._df = pd.concat([self._df, self.tf_reports], axis=1)
 
         # Drop strings containing cleaned text.
-        self.df = self.df.drop(columns=['_cleaned_text_report_', '_cleaned_text_paper_'])
+        self._df = self._df.drop(columns=['_cleaned_text_report_', '_cleaned_text_paper_'])
 
     def ols_regress(self, y, X, model_name, add_constant, logistic, log_transform, standardize):
         # Check that specified independent, dependent variables are valid.
         self._validate_columns(y, X)
 
         # Select specified columns from DataFrame.
-        dependent_variable = self.df[y]
-        independent_variables = self.df[X]
+        dependent_variable = self._df[y]
+        independent_variables = self._df[X]
 
         # Instantiate an OLS regression object.
         self.models[model_name] = OLSRegression(model_name=model_name,
@@ -223,7 +257,6 @@ class RefereeReportDataset:
                                                 add_constant=add_constant,
                                                 logistic=logistic)
         self.models[model_name].fit_ols()
-
 
     def regularized_regress(self,
                             y,
@@ -244,8 +277,8 @@ class RefereeReportDataset:
         self._validate_columns(y, X)
 
         # Select specified columns from DataFrame.
-        dependent_variable = self.df[y]
-        independent_variables = self.df[X]
+        dependent_variable = self._df[y]
+        independent_variables = self._df[X]
 
         # Instantiate a RegularizedRegression object.
         self.models[model_name] = RegularizedRegression(model_name,
@@ -256,72 +289,70 @@ class RefereeReportDataset:
                                                         standardize,
                                                         log_transform,
                                                         alphas,
-                                                        method, 
+                                                        method,
                                                         cv_folds,
                                                         stratify,
-                                                        self.seed,
+                                                        self._seed,
                                                         l1_ratios,
                                                         self.path_to_output,
                                                         adjust_alpha)
         if sklearn:
             self.models[model_name].fit_cross_validated_sklearn()
-        else:                                                
+        else:
             self.models[model_name].fit_cross_validated()
-    
+
     def resample_variable_binomial(self, variable: str, p: float, ensure_balanced: bool):
         # Check that the requested column to resample is actually a column in the dataset.
         self._validate_columns(y=variable, X=[], check_length=False)
 
-        np.random.seed(self.seed)
+        np.random.seed(self._seed)
 
-        female_indices = np.random.choice(np.array(np.arange(start=0, stop=len(self.df), step=1)),
-                                          size=int(0.5 * len(self.df)),
+        female_indices = np.random.choice(np.array(np.arange(start=0, stop=len(self._df), step=1)),
+                                          size=int(0.5 * len(self._df)),
                                           replace=False)
-        non_female_indices = self.df.index.difference(female_indices)
-        self.df.loc[female_indices, variable] = 1
-        self.df.loc[non_female_indices, variable] = 0
-
-
+        non_female_indices = self._df.index.difference(female_indices)
+        self._df.loc[female_indices, variable] = 1
+        self._df.loc[non_female_indices, variable] = 0
 
     def _produce_summary_statistics(self,
                                     adjust_reports_with_papers: bool,
                                     normalize_documents_by_length: bool
                                     ):
         # Pie chart: number of papers with mixed-gender refereeship vs. all female refereeship vs. all male refereeship
-        mean_female_by_paper = ( self.df.groupby(by='_paper_', observed=True)
-                                 .mean()['_female_']  # Get mean of female within each group.
-                               )
-        mean_female_by_paper[(mean_female_by_paper != 0) & (mean_female_by_paper != 1)] = "Refereed by Females and Non-Females"        
-        mean_female_by_paper = mean_female_by_paper.replace({0: "Refereed by Non-Females Only", 1: "Refereed by Females Only"})    
-  
+        mean_female_by_paper = (self._df.groupby(by='_paper_', observed=True)
+        .mean()['_female_']  # Get mean of female within each group.
+        )
+        mean_female_by_paper[(mean_female_by_paper != 0) & (mean_female_by_paper != 1)] = "Refereed by Females and Non-Females"
+        mean_female_by_paper = mean_female_by_paper.replace({0: "Refereed by Non-Females Only", 1: "Refereed by Females Only"})
+
         mean_female_by_paper_grouped = mean_female_by_paper.groupby(mean_female_by_paper).count()  # Get counts of each unique value        
         plot_pie(x=mean_female_by_paper_grouped,
                  filepath=os.path.join(self.path_to_output, 'pie_referee_genders_by_paper.png'),
                  title="Gender Breakdowns of Paper Referees")
 
         # Pie chart: number of referees on each paper.
-        referees_per_paper = ( self.df.groupby(by='_paper_', observed=True)
-                                .count()
-                                .mean(axis=1)  # Every column in this DataFrame is identical, so mean across axes to reduce.
-                                .astype(int)  
-                                .replace({1: "One Referee",
-                                                         2: "Two Referees",
-                                                         3: "Three Referees",
-                                                         4: "Four Referees"})
-                             )  
+        referees_per_paper = (self._df.groupby(by='_paper_', observed=True)
+                              .count()
+                              .mean(axis=1)  # Every column in this DataFrame is identical, so mean across axes to reduce.
+                              .astype(int)
+                              .replace({1: "One Referee",
+                                        2: "Two Referees",
+                                        3: "Three Referees",
+                                        4: "Four Referees"})
+                              )
         referees_per_paper_grouped = referees_per_paper.groupby(referees_per_paper).count()  # Get counts of each unique value.
         plot_pie(x=referees_per_paper_grouped,
                  filepath=os.path.join(self.path_to_output, 'pie_num_referees_per_paper.png'),
-                 title="Number of Referees Per Paper")  
-        
+                 title="Number of Referees Per Paper")
+
         # Histogram: Skewness of the word count variables.
         if adjust_reports_with_papers:
             title = "Skewness of Paper-Adjusted Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_paper_adjusted_" + str(self.ngrams)+ "_grams_counts_skewness.png")
+            filepath = os.path.join(self.path_to_output, "hist_paper_adjusted_" + str(self.ngrams) + "_grams_counts_skewness.png")
         else:
             title = "Skewness of Raw Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_raw_" + str(self.ngrams)+ "_grams_counts_skewness.png")
-        skewness = self.df[self.report_vocabulary].skew(axis=0)
+            filepath = os.path.join(self.path_to_output, "hist_raw_" + str(self.ngrams) + "_grams_counts_skewness.png")
+        skewness = self._df[self.report_vocabulary].skew(axis=0)
         plot_histogram(x=skewness,
                        filepath=filepath,
                        title=title,
@@ -334,47 +365,47 @@ class RefereeReportDataset:
         # Histogram: Skewness of log(x+1)-transformed word count variables.
         if adjust_reports_with_papers:
             title = "Skewness of ln(x+1)-Transformed Paper-Adjusted Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_paper_adjusted_" + str(self.ngrams)+ "_grams_counts_skewness_log_transformed.png")
+            filepath = os.path.join(self.path_to_output, "hist_paper_adjusted_" + str(self.ngrams) + "_grams_counts_skewness_log_transformed.png")
         else:
             title = "Skewness of ln(x+1)-Transformed Raw Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_raw_" + str(self.ngrams)+ "_grams_counts_skewness_log_transformed.png")
-        skewness = np.log(self.df[self.report_vocabulary] + 1).skew(axis=0)
+            filepath = os.path.join(self.path_to_output, "hist_raw_" + str(self.ngrams) + "_grams_counts_skewness_log_transformed.png")
+        skewness = np.log(self._df[self.report_vocabulary] + 1).skew(axis=0)
         plot_histogram(x=skewness,
                        filepath=filepath,
                        title=title,
                        xlabel="Skewness of Variable")
 
         # Pie chart: Breakdown of decision and recommendation
-        decision_breakdown = self.df['_decision_'].value_counts()
+        decision_breakdown = self._df['_decision_'].value_counts()
         plot_pie(x=decision_breakdown,
                  filepath=os.path.join(self.path_to_output, 'pie_decision.png'),
                  title="Breakdown of Referee Decisions")
 
-        recommendation_breakdown = self.df['_recommendation_'].value_counts()
+        recommendation_breakdown = self._df['_recommendation_'].value_counts()
         plot_pie(x=recommendation_breakdown,
                  filepath=os.path.join(self.path_to_output, 'pie_recomendation.png'),
                  title="Breakdown of Referee Recommendation")
-        
+
         # Pie chart: Breakdown of referee decision and recommendation by gender.
-        plot_pie_by(x=self.df['_decision_'],
-                    by=self.df['_female_'],
+        plot_pie_by(x=self._df['_decision_'],
+                    by=self._df['_female_'],
                     filepath=os.path.join(self.path_to_output, "pie_decision_by_female.png"),
                     title="Breakdown of Referee Decision by Referee Gender",
                     by_value_labels={0: "Non-Female", 1: "Female"})
 
-        plot_pie_by(x=self.df['_recommendation_'],
-                    by=self.df['_female_'],
+        plot_pie_by(x=self._df['_recommendation_'],
+                    by=self._df['_female_'],
                     filepath=os.path.join(self.path_to_output, "pie_recommendation_by_female.png"),
                     title="Breakdown of Referee Recommendation by Referee Gender",
                     by_value_labels={0: "Non-Female", 1: "Female"})
 
         # Pie chart: Breakdown of the number and gender of referees for each paper.
-        referee_counts_each_gender = (self.df.groupby(by=['_paper_', '_female_'], observed=True)
-                                        .count()  # Get number of referees of each gender for each paper.
-                                        .mean(axis=1)  # Counts are identical across columns, so take mean across columns to reduce.
-                                        .unstack()  # Reshape from long to wide.
-                                        .value_counts()  # Get counts of each permutation.
-        )
+        referee_counts_each_gender = (self._df.groupby(by=['_paper_', '_female_'], observed=True)
+                                      .count()  # Get number of referees of each gender for each paper.
+                                      .mean(axis=1)  # Counts are identical across columns, so take mean across columns to reduce.
+                                      .unstack()  # Reshape from long to wide.
+                                      .value_counts()  # Get counts of each permutation.
+                                      )
         # Assign new index so that helper function can generate a labeled pie chart.
         referee_counts_each_gender = pd.Series(referee_counts_each_gender.values,
                                                index=['One Non-Female, One Female', 'Two Non-Female, One Female', 'One Non-Female, Two Female'])
@@ -385,7 +416,7 @@ class RefereeReportDataset:
         if not normalize_documents_by_length:
             # Histogram: Number of tokens in reports.
             tokens_per_report = self.tf_reports[self.report_vocabulary].sum(axis=1)
-            xlabel = '''Length (''' + str(self.ngrams) +'''-Gram Tokens)
+            xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
         
             Note: This figure is a histogram of the number of tokens in the sample reports after all cleaning, 
             sample restriction, vectorization, and removal of low-frequency tokens. Equivalently, this figure
@@ -393,13 +424,13 @@ class RefereeReportDataset:
                     '''
             plot_histogram(x=tokens_per_report,
                            filepath=os.path.join(self.path_to_output,
-                                              "hist_tokens_per_report_immediately_before_analysis.png"),
+                                                 "hist_tokens_per_report_immediately_before_analysis.png"),
                            title="Number of Tokens in Each Report (" + str(self.ngrams) + "-Grams)",
                            xlabel=xlabel)
 
             # Histogram: Number of tokens in papers.
             tokens_per_paper = self.tf_papers[self.report_vocabulary].sum(axis=1)
-            xlabel = '''Length (''' + str(self.ngrams) +'''-Gram Tokens)
+            xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
 
             Note: This figure is a histogram of the number of tokens in the sample papers after cleaning, 
             sample restriction, restriction to introductions, removal of thank yous, vectorization, and
@@ -421,7 +452,7 @@ class RefereeReportDataset:
         #         # Histogram: Frequencies in the paper-adjusted D.T.M. for the reports.
         #         token_counts = self.tf_reports_adjusted[self.report_vocabulary].to_numpy().flatten()
         #         xlabel = """Values in Paper-Adjusted Matrix
-                            
+
         #             Note: This figure is a histogram of the values in the normalized
         #             paper-adjusted reports matrix. To calculate this figure, I first
         #             add one to every cell of the reports D.T.M. and the papers D.T.M.
@@ -432,13 +463,13 @@ class RefereeReportDataset:
         #             normalized papers D.T.M.
         #             """
         #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.path_to_output, "hist_paper_adjusted_matrix_immediately_before_analysis.png"),
+        #                     filepath=os.path.join(self.output_directory, "hist_paper_adjusted_matrix_immediately_before_analysis.png"),
         #                     title="Distribution of Paper-Adjusted Token Frequencies in Reports (" + str(self.ngrams) + "-Grams)",
         #                     xlabel=xlabel)
         #         # Histogram: Log frequencies in the paper-adjusted D.T.M. for the reports.
         #         token_counts = np.log(self.tf_reports_adjusted[self.report_vocabulary] + 1).to_numpy().flatten()
         #         xlabel = """Values in Paper-Adjusted Matrix
-                            
+
         #                     Note: This figure is a histogram of the values in the normalized
         #                     paper-adjusted reports matrix. To calculate this figure, I first
         #                     add one to every cell of the reports D.T.M. and the papers D.T.M.
@@ -450,27 +481,27 @@ class RefereeReportDataset:
         #                     take the base ten log of each cell.
         #                     """
         #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.path_to_output, "hist_log_paper_adjusted_matrix_immediately_before_analysis.png"),
+        #                     filepath=os.path.join(self.output_directory, "hist_log_paper_adjusted_matrix_immediately_before_analysis.png"),
         #                     title="Distribution of Log-Transformed Paper-Adjusted Token Frequencies in Reports (" + str(self.ngrams) + "-Grams)",
         #                     xlabel=xlabel)
         #     else:
         #         # Histogram: Counts in the paper-adjusted D.T.M. for the reports.
         #         token_counts = self.tf_reports_adjusted[self.report_vocabulary].to_numpy().flatten()
         #         xlabel = """Values in Paper-Adjusted Matrix
-                                                        
+
         #                     Note: This figure is a histogram of the values in the paper-adjusted
         #                     reports D.T.M. To produce the paper-adjusted reports D.T.M., I
         #                     subtract from each row (i, j) of the reports D.T.M. row j of the
         #                     papers D.T.M.
         #                     """
         #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.path_to_output, "hist_paper_adjusted_matrix_immediately_before_analysis.png"),
+        #                     filepath=os.path.join(self.output_directory, "hist_paper_adjusted_matrix_immediately_before_analysis.png"),
         #                     title="Distribution of Paper-Adjusted Token Counts in Reports (" + str(self.ngrams) + "-Grams)",
         #                     xlabel=xlabel)
         #         # Histogram: Log counts in the paper-adjusted D.T.M. for the reports.
         #         token_counts = np.log(self.tf_reports_adjusted[self.report_vocabulary] + 1).to_numpy().flatten()
         #         xlabel = """Values in Paper-Adjusted Matrix
-                            
+
         #                     Note: This figure is a histogram of the values in the paper-adjusted
         #                     reports D.T.M. To produce the paper-adjusted reports D.T.M., I
         #                     subtract from each row (i, j) of the reports D.T.M. row j of the
@@ -478,33 +509,32 @@ class RefereeReportDataset:
         #                     take the base ten log of each cell.
         #                     """
         #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.path_to_output, "hist_log_paper_adjusted_matrix_immediately_before_analysis.png"),
+        #                     filepath=os.path.join(self.output_directory, "hist_log_paper_adjusted_matrix_immediately_before_analysis.png"),
         #                     title="Distribution of Log Paper-Adjusted Token Counts in Reports (" + str(self.ngrams) + "-Grams)",
         #                     xlabel=xlabel)
 
-        
         # # Histogram: Counts of each token in the reports.
         # token_counts = self.tf_reports[self.report_vocabulary].sum(axis=0)
         # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.path_to_output,
+        #                filepath=os.path.join(self.output_directory,
         #                                      "hist_token_counts_immediately_before_analysis_reports.png"),
         #                title="Distribution of Total Appearances Across Tokens in Reports (" + str(self.ngrams) + "-Grams)",
         #                xlabel='''Number of Times Token Appears
-                       
+
         #                         This figure plots the distribution of tokens' total apperances across reports.
         #                         To produce this figure, I first calculate the total number of times each token appears
         #                         across all reports. I then bin tokens according to those sums and display the results
         #                         above.
         #                ''')
-        
+
         # # Histogram: Counts of each token in the papers.
         # token_counts = self.tf_papers[self.report_vocabulary].sum(axis=0)
         # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.path_to_output,
+        #                filepath=os.path.join(self.output_directory,
         #                                      "hist_token_counts_immediately_before_analysis_papers.png"),
         #                title="Distribution of Total Apperances Across Tokens in Papers (" + str(self.ngrams) + "-Grams)",
         #                xlabel='''Number of Times Token Appears
-                       
+
         #                This figure plots the distribution of tokens' total appearances across papers.
         #                To produce this figure, I first calculate the total number of times each token appears
         #                across all papers. I then bin tokens according to those sums and display the results above.
@@ -513,41 +543,41 @@ class RefereeReportDataset:
         # # Histogram: Counts of each token in the reports, log(x+1) transformed.
         # token_counts = np.log(self.tf_reports[self.report_vocabulary] + 1).sum(axis=0) 
         # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.path_to_output,
+        #                filepath=os.path.join(self.output_directory,
         #                                      "hist_token_log_counts_immediately_before_analysis_reports.png"),
         #                title="Distribution of log(x+1)-Transformed Counts Across Reports (" + str(self.ngrams) + "-Grams)",
         #                xlabel='''Sum of log(x+1)-Transformed Counts
-                       
+
         #                This figure plots the distribution of tokens' log(x+1)-transformed counts,
         #                summed across reports. To produce this figure, I add 1 to each cell of the 
         #                D.T.M. for the reports. Then, I take the natural log of each cell. Lastly,
         #                I sum the D.T.M. across reports (rows) and bin the tokens according to the
         #                resulting sums.
         #                ''')
-        
+
         # # Histogram: Counts of each token in the papers, log(x+1) transformed.
         # token_counts = np.log(self.tf_papers[self.report_vocabulary] + 1).sum(axis=0)
         # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.path_to_output,
+        #                filepath=os.path.join(self.output_directory,
         #                                      "hist_token_log_counts_immediately_before_analysis_papers.png"),
         #                title="Distribution of log(x+1)-Transformed Counts Across Papers (" + str(self.ngrams) + "-Grams)",
         #                xlabel='''Sum of log(x+1)-Transformed Counts
-                       
+
         #                This figure plots the distribution of tokens' log(x+1)-transformed counts, 
         #                summed across papers. To produce this figure, I add 1 to each cell of the 
         #                D.T.M. for the reports. Then, I take the natural log of each cell. Lastly,
         #                I sum the D.T.M. across papers (rows) and bin the tokens according to the
         #                resulting sums.
         #                ''')
-                       
+
         # """
 
         # Histogram: Number of reports in which tokens appear.
         num_reports_where_word_appears = (self.tf_reports
-                                              .mask(self.tf_reports > 0, 1)
-                                              .sum(axis=0)
-                                              .transpose()
-            )
+                                          .mask(self.tf_reports > 0, 1)
+                                          .sum(axis=0)
+                                          .transpose()
+                                          )
 
         xlabel = """Number of Reports
 
@@ -556,19 +586,19 @@ class RefereeReportDataset:
         I calculate the number of reports in which each token appears at least once. I sort tokens into bins
         based on those values to produce this figure. """
         plot_histogram(x=num_reports_where_word_appears,
-                           title="Number of Reports in Which Tokens Appear (" + str(self.ngrams) + "-grams)",
-                           xlabel=xlabel,
-                           filepath=os.path.join(self.path_to_output, 'hist_num_reports_where_tokens_appear_' + str(self.ngrams) + '_grams.png'))
+                       title="Number of Reports in Which Tokens Appear (" + str(self.ngrams) + "-grams)",
+                       xlabel=xlabel,
+                       filepath=os.path.join(self.path_to_output, 'hist_num_reports_where_tokens_appear_' + str(self.ngrams) + '_grams.png'))
 
         # Hist: Average length of male vs. female reports immediately before analysis.
         report_lengths = (
             self.tf_reports
             .sum(axis=1)
         )
-        male_report_lengths = report_lengths.loc[self.df['_female_'] == 0]
+        male_report_lengths = report_lengths.loc[self._df['_female_'] == 0]
         male_report_lengths_mean = male_report_lengths.mean().round(3)
         male_report_lengths_se = male_report_lengths.sem().round(3)
-        female_report_lengths = report_lengths.loc[self.df['_female_'] == 1]
+        female_report_lengths = report_lengths.loc[self._df['_female_'] == 1]
         female_report_lengths_mean = female_report_lengths.mean().round(3)
         female_report_lengths_se = female_report_lengths.sem().round(3)
 
@@ -599,50 +629,58 @@ class RefereeReportDataset:
 
         # Table: Most common words for men and women (R).
         occurrences_by_gender = (
-            pd.concat([self.tf_reports, self.df['_female_']], axis=1)
+            pd.concat([self.tf_reports, self._df['_female_']], axis=1)
             .groupby(by='_female_')
             .sum()
             .transpose()
         )
-        
-        male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False), name="Most Common Words in Male-Written Reports").reset_index().iloc[:50]
-        male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename("\textbf{Most Common Words in Male-Written Reports}")
-        female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False), name="Most Common Words in Female-Written Reports").reset_index().iloc[:50]
-        female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename("\textbf{Most Common Words in Female-Written Reports}")
-        pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(os.path.join(self.path_to_output, "table_most_common_words_by_gender_R_" + str(self.ngrams) + "_grams.tex"),
-                                                                           index=False,
-                                                                           escape=False,
-                                                                           float_format="%.3f")
+
+        male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
+                                     name="Most Common Words in Male-Written Reports").reset_index().iloc[:50]
+        male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
+            "\textbf{Most Common Words in Male-Written Reports}")
+        female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
+                                       name="Most Common Words in Female-Written Reports").reset_index().iloc[:50]
+        female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
+            "\textbf{Most Common Words in Female-Written Reports}")
+        pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
+            os.path.join(self.path_to_output, "table_most_common_words_by_gender_R_" + str(self.ngrams) + "_grams.tex"),
+            index=False,
+            escape=False,
+            float_format="%.3f")
 
         # Table: Most common words for men and women (NR).
         report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
         occurrences_by_gender = (
-            pd.concat([self.tf_reports.div(report_lengths, axis=0), self.df['_female_']], axis=1)
+            pd.concat([self.tf_reports.div(report_lengths, axis=0), self._df['_female_']], axis=1)
             .groupby(by='_female_')
             .sum()
             .transpose()
         )
-        male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False), name="Most Common Words in Male-Written Reports").reset_index().iloc[:50].round(3)
-        male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename("\textbf{Most Common Words in Male-Written Reports}")
-        female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False), name="Most Common Words in Female-Written Reports").reset_index().iloc[:50].round(3)
-        female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename("\textbf{Most Common Words in Female-Written Reports}")
-        pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(os.path.join(self.path_to_output, "table_most_common_words_by_gender_NR_" + str(self.ngrams) + "_grams.tex"),
-                                                                           index=False,
-                                                                           escape=False,
-                                                                           float_format="%.3f")
+        male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
+                                     name="Most Common Words in Male-Written Reports").reset_index().iloc[:50].round(3)
+        male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
+            "\textbf{Most Common Words in Male-Written Reports}")
+        female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
+                                       name="Most Common Words in Female-Written Reports").reset_index().iloc[:50].round(3)
+        female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
+            "\textbf{Most Common Words in Female-Written Reports}")
+        pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
+            os.path.join(self.path_to_output, "table_most_common_words_by_gender_NR_" + str(self.ngrams) + "_grams.tex"),
+            index=False,
+            escape=False,
+            float_format="%.3f")
 
-
-        
         # Hist: Cosine similarity between NR vectors and NP vectors, separately for males and females.
         report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
         NR = self.tf_reports.div(report_lengths, axis=0)
         paper_lengths = self.tf_papers.sum(axis=1)  # Calculate NP_j
         NP = self.tf_papers.div(paper_lengths, axis=0)
-        index = pd.MultiIndex.from_frame(self.df[['_paper_', '_refnum_']], names=['_paper_', '_refnum_'])
-        columns = self.df['_paper_']
+        index = pd.MultiIndex.from_frame(self._df[['_paper_', '_refnum_']], names=['_paper_', '_refnum_'])
+        columns = self._df['_paper_']
         cosine_similarities = pd.DataFrame(cosine_similarity(NR, NP), index=index, columns=columns)
         cosine_similarities = pd.Series(np.diag(cosine_similarities), index=cosine_similarities.index, name='similarity')
-        genders = self.df[['_female_', '_paper_', '_refnum_']].set_index(['_paper_', '_refnum_'])
+        genders = self._df[['_female_', '_paper_', '_refnum_']].set_index(['_paper_', '_refnum_'])
         cosine_similarities_and_genders = pd.concat([cosine_similarities, genders], axis=1)
         cosine_similarities_males = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 0, 'similarity']
         cosine_similarities_females = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 1, 'similarity']
@@ -662,7 +700,7 @@ class RefereeReportDataset:
                   summary_statistics=['median'])
 
         female_mean = cosine_similarities_females.mean().round(3)
-        female_se = cosine_similarities_females.sem().round(3)  
+        female_se = cosine_similarities_females.sem().round(3)
         plot_hist(ax=ax,
                   x=cosine_similarities_females,
                   title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
@@ -677,16 +715,15 @@ class RefereeReportDataset:
         plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_cosine_similarity_NR_NP_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
         plt.close(fig)
 
-
     def get_vocabulary(self):
         return self.report_vocabulary
 
     def build_regularized_results_table(self, model_name, num_coefs_to_report=30):
         self._validate_model_request(model_name, expected_model_type="Regularized")
-        
+
         # Store results table.
         results_table = self.models[model_name].get_results_table()
-        
+
         # Validate requested number of top/bottom coefficients.
         if len(results_table) < num_coefs_to_report * 2:
             raise ValueError("There are fewer than " + str(num_coefs_to_report * 2) + " coefficients in the results table.")
@@ -702,14 +739,11 @@ class RefereeReportDataset:
             metrics = metrics.drop(labels="Optimal L1 Penalty Weight")
         metrics = metrics.reset_index()
         metrics = metrics['index'] + ": " + metrics['Metrics'].round(3).astype(str)
-        
-
-
 
         # Store specified dummy variables in a named column.
         dummy_coefficients = pd.Series(results_table.loc[self.models[model_name].dummy_variables], name="Dummy Variables").reset_index()
-        dummy_coefficients = dummy_coefficients['index'] + ": " + dummy_coefficients['Dummy Variables'].round(3).astype(str)                    
-        
+        dummy_coefficients = dummy_coefficients['index'] + ": " + dummy_coefficients['Dummy Variables'].round(3).astype(str)
+
         # Drop non-coefficients from the Series of coefficients and sort coefficients by value.
         non_text_coefs = self.models[model_name].dummy_variables + OutputTableConstants.REGULARIZED_REGRESSION_METRICS.value
         coefficients_sorted = results_table.drop(labels=non_text_coefs).sort_values(ascending=False)
@@ -718,13 +752,14 @@ class RefereeReportDataset:
         top_coefficients = pd.Series(coefficients_sorted.iloc[:num_coefs_to_report], name="Largest " + str(num_coefs_to_report) + " Coefficients").reset_index()
         top_coefficients = top_coefficients[top_coefficients["Largest " + str(num_coefs_to_report) + " Coefficients"] != 0]
         top_coefficients = top_coefficients['index'] + ": " + top_coefficients["Largest " + str(num_coefs_to_report) + " Coefficients"].round(3).astype(str)
-        
-        # Get smallest nonzero coefficients; concatenate them with the associated token.
-        bottom_coefficients = pd.Series(coefficients_sorted.iloc[-num_coefs_to_report:], name="Smallest " + str(num_coefs_to_report) + " Coefficients").reset_index()
-        bottom_coefficients = bottom_coefficients[bottom_coefficients["Smallest " + str(num_coefs_to_report) + " Coefficients"] != 0]
-        bottom_coefficients = bottom_coefficients['index'] + ": " + bottom_coefficients["Smallest " + str(num_coefs_to_report) + " Coefficients"].round(3).astype(str)
-        bottom_coefficients = bottom_coefficients.iloc[::-1].reset_index(drop=True)  # Flip order.
 
+        # Get smallest nonzero coefficients; concatenate them with the associated token.
+        bottom_coefficients = pd.Series(coefficients_sorted.iloc[-num_coefs_to_report:],
+                                        name="Smallest " + str(num_coefs_to_report) + " Coefficients").reset_index()
+        bottom_coefficients = bottom_coefficients[bottom_coefficients["Smallest " + str(num_coefs_to_report) + " Coefficients"] != 0]
+        bottom_coefficients = bottom_coefficients['index'] + ": " + bottom_coefficients["Smallest " + str(num_coefs_to_report) + " Coefficients"].round(
+            3).astype(str)
+        bottom_coefficients = bottom_coefficients.iloc[::-1].reset_index(drop=True)  # Flip order.
 
         results_table = pd.concat([top_coefficients, bottom_coefficients, dummy_coefficients, metrics], axis=1)
         results_table = results_table.fillna(' ')
@@ -739,11 +774,11 @@ class RefereeReportDataset:
                                index=False,
                                escape=False,
                                float_format="%.3f")
-    
+
     def build_ols_results_table(self,
                                 filename: str,
                                 requested_models: List[str],
-                                title: str=None,
+                                title: str = None,
                                 show_confidence_intervals=False,
                                 dependent_variable_name=None,
                                 column_titles=None,
@@ -768,10 +803,9 @@ class RefereeReportDataset:
             self._validate_model_request(model_name, expected_model_type="OLS")
             current_result = self.models[model_name].get_results_table()
             results.append(current_result)
-        
+
         # Build table with Stargazer.
         stargazer = Stargazer(results)
-        
 
         # Edit table.
         if title is not None:
@@ -799,17 +833,14 @@ class RefereeReportDataset:
         with open(os.path.join(self.path_to_output, filename + ".tex"), "w") as output_file:
             output_file.write(latex)
 
-
         html = stargazer.render_html()
         # TODO: Delete this! Just for viewing purposes as I debug.
         with open(os.path.join(self.path_to_output, filename + ".html"), "w") as html_output_file:
             html_output_file.write(html)
 
-
-
     def _validate_columns(self, y, X, check_length=True):
-        columns = self.df.columns.tolist()
-        
+        columns = self._df.columns.tolist()
+
         if (y not in columns):
             error_msg = "The specified dependent variable is not a variable in the dataset."
             raise ValueError(error_msg)
@@ -824,33 +855,33 @@ class RefereeReportDataset:
         if not isinstance(column, pd.Series):
             error_msg = "The passed column is not a pandas Series."
             raise ValueError(error_msg)
-        elif len(column) != len(self.df):
+        elif len(column) != len(self._df):
             error_msg = "The specified column must contain the same number of rows as the existing dataset."
             raise ValueError(error_msg)
-        elif column.index.tolist() != self.df.index.tolist():
+        elif column.index.tolist() != self._df.index.tolist():
             error_msg = "The specified column must have an idential pandas Index compared to the existing dataset."
             raise ValueError(error_msg)
-        elif column.name in set(self.df.columns.tolist()):
+        elif column.name in set(self._df.columns.tolist()):
             error_msg = "The specified column's name must not be identical to an existing column in the dataset."
             raise ValueError(error_msg)
         else:
-            self.df = pd.concat([self.df, column], axis=1)
+            self._df = pd.concat([self._df, column], axis=1)
 
     def _restrict_to_papers_with_mixed_gender_referees(self):
         # Get the portion of each paper's referees who are female.
-        refereeship_gender_breakdown = pd.Series(self.df.groupby('_paper_', observed=True)['_female_'].transform('mean'),
+        refereeship_gender_breakdown = pd.Series(self._df.groupby('_paper_', observed=True)['_female_'].transform('mean'),
                                                  name='gender_breakdown')
 
         # Drop rows where 0% or 100% of referees are female.
         all_female_or_all_male = refereeship_gender_breakdown.loc[(refereeship_gender_breakdown == 0) | (refereeship_gender_breakdown == 1)]
 
-        self.df = self.df.drop(index=all_female_or_all_male.index).reset_index(drop=True)
+        self._df = self._df.drop(index=all_female_or_all_male.index).reset_index(drop=True)
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
-        self.models[model_name] = LikelihoodRatioModel(dtm=self.df[self.report_vocabulary],
-                                                       document_classification_variable=self.df['_female_'],
-                                                       fe_variable=self.df['_paper_'],
-                                                       model_type=model_type)                                                                                                                                                                                            
+        self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
+                                                       document_classification_variable=self._df['_female_'],
+                                                       fe_variable=self._df['_paper_'],
+                                                       model_type=model_type)
         self.models[model_name].fit()
 
     def _validate_model_request(self, model_name, expected_model_type):
@@ -864,7 +895,7 @@ class RefereeReportDataset:
 
     def build_likelihood_results_table(self, model_name, num_ratios_to_report=40, decimal_places=3):
         self._validate_model_request(model_name, "Likelihood Ratio")
-        
+
         # Store results table.
         results_table = self.models[model_name].get_results_table()
 
@@ -877,22 +908,21 @@ class RefereeReportDataset:
         sorted_pooled_ratios = (results_table[pooled_columns]
                                 .sort_values(by='pooled_ratios')  # Sort likelihood ratios. 
                                 .reset_index()  # Reset index, containing the words corresponding to each ratio, and add it as a column.
-                                )                                    
+                                )
         # Get highest pooled likelihood ratios.
         highest_pooled_ratios = sorted_pooled_ratios.iloc[-num_ratios_to_report:]
         # Concatenate words with their corresponding likelihood ratios.
         highest_pooled_ratios.loc[:, 'Highest Pooled Ratios'] = (highest_pooled_ratios['index'] +
-                                                                                               ": " +
-                                                                                               highest_pooled_ratios['pooled_ratios'].astype(str)
-                                                                                               )
+                                                                 ": " +
+                                                                 highest_pooled_ratios['pooled_ratios'].astype(str)
+                                                                 )
         # Get lowest likelihood ratios.
         lowest_pooled_ratios = sorted_pooled_ratios.iloc[:num_ratios_to_report]
         # Concatenate words with their corresponding likelihood ratios.
         lowest_pooled_ratios.loc[:, 'Lowest Pooled Ratios'] = (lowest_pooled_ratios['index'] +
-                                                                                             ": " +
-                                                                                             lowest_pooled_ratios['pooled_ratios'].astype(str)
-                                                                                             )
-
+                                                               ": " +
+                                                               lowest_pooled_ratios['pooled_ratios'].astype(str)
+                                                               )
 
         # Build results table for within-paper estimates.===========================================
         fe_columns = ["fe_ratios",
@@ -903,21 +933,21 @@ class RefereeReportDataset:
         sorted_fe_ratios = (results_table[fe_columns]
                             .sort_values(by='fe_ratios')  # Sort likelihood ratios.
                             .reset_index()  # Reset index, containing the words corresponding to each ratio, and add it as a column.
-        )
+                            )
         # Get highest likelihood ratios.
         highest_fe_ratios = sorted_fe_ratios.iloc[-num_ratios_to_report:]
         # Concatenate words with their corresponding likelihood ratios.
         highest_fe_ratios.loc[:, "Highest Within-Paper Ratios"] = (highest_fe_ratios['index'] +
-                                                                                                   ": " +
-                                                                                                   highest_fe_ratios['fe_ratios'].astype(str)
-                                                                                                   )        
+                                                                   ": " +
+                                                                   highest_fe_ratios['fe_ratios'].astype(str)
+                                                                   )
         # Get lowest likelihood ratios.
         lowest_fe_ratios = sorted_fe_ratios.iloc[:num_ratios_to_report]
         # Concatenate words with their corresponding likelihood ratios.
         lowest_fe_ratios.loc[:, "Lowest Within-Paper Ratios"] = (lowest_fe_ratios['index'] +
-                                                                                                 ": " +
-                                                                                                 lowest_fe_ratios["fe_ratios"].astype(str)
-                                                                                                 )  
+                                                                 ": " +
+                                                                 lowest_fe_ratios["fe_ratios"].astype(str)
+                                                                 )
 
         # Plot likelihood ratios by the frequency of the associated tokens.
         extreme_pooled_ratios = pd.concat([highest_pooled_ratios['pooled_ratios'],
@@ -931,12 +961,12 @@ class RefereeReportDataset:
                                               axis=0)
         fe_ratios_frequencies = pd.concat([highest_fe_ratios['frequency_over_documents'],
                                            lowest_fe_ratios['frequency_over_documents']],
-                                          axis=0)    
-        fig, axs = plt.subplots(2, 1, sharex='col')            
+                                          axis=0)
+        fig, axs = plt.subplots(2, 1, sharex='col')
         y_list = [extreme_pooled_ratios,
                   extreme_fe_ratios]
         x_list = [pooled_ratios_frequencies,
-                 fe_ratios_frequencies]
+                  fe_ratios_frequencies]
         xlabels = ["",
                    """Portion of Documents in Which Token Appears
 
@@ -963,9 +993,9 @@ class RefereeReportDataset:
         # Produce final results table.
         highest_df = (pd.concat([highest_pooled_ratios['Highest Pooled Ratios'],
                                  highest_fe_ratios["Highest Within-Paper Ratios"]],
-                               axis=1)
-                               .iloc[::-1]
-                               .reset_index(drop=True)
+                                axis=1)
+                      .iloc[::-1]
+                      .reset_index(drop=True)
                       )
         lowest_df = (pd.concat([lowest_pooled_ratios['Lowest Pooled Ratios'],
                                 lowest_fe_ratios["Lowest Within-Paper Ratios"]],
@@ -974,8 +1004,6 @@ class RefereeReportDataset:
 
         pd.set_option('display.max_colwidth', -1)
         metrics = results_table['Metrics'].reset_index(drop=True).loc[:3]
-        results  = pd.concat([lowest_df, highest_df, metrics], axis=1)
+        results = pd.concat([lowest_df, highest_df, metrics], axis=1)
         results.columns = ["\textbf{" + column + "}" for column in results.columns]
         results.to_latex(os.path.join(self.path_to_output, model_name + "_ratio_results.tex"), index=False, escape=False)
-
-        

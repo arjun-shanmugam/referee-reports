@@ -26,19 +26,16 @@ print("READING PAPERS")
 paper_reader = PaperReader(RAW_PICKLED_PAPERS,
                            CLEANED_PICKLED_OUTPUT)
 paper_reader.build_df()
-paper_reader.analyze_repeated_documents("filetype_analysis_papers.png")
 print("Done!")
 print("\n\n\n\n")
 
 
 # Read Reports===================================================================================================
 print("READING REPORTS")
-report_reader = ReportReader(raw_pickled_documents_directory=RAW_PICKLED_REPORTS,
-                             cleaned_pickled_output_directory=CLEANED_PICKLED_OUTPUT,
-                             path_to_output=PREPROCESSING_OUTPUT,
-                             path_to_referee_characteristics=REFEREE_CHARACTERISTICS)
+report_reader = ReportReader(RAW_PICKLED_REPORTS,
+                             CLEANED_PICKLED_OUTPUT,
+                             REFEREE_CHARACTERISTICS)
 report_reader.build_df()
-report_reader.analyze_repeated_documents("filetype_analysis_reports.png")
 print("Done!")
 print("\n\n\n\n")
 

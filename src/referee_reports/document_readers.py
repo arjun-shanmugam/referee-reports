@@ -7,10 +7,8 @@ import os
 import pickle
 import re
 from typing import List
-import matplotlib.pyplot as plt
 import pandas as pd
 import pkldir
-
 import referee_reports.document_readers
 from referee_reports.constants import NLPConstants
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -53,10 +51,10 @@ class JournalDocumentReader:
                                     "Check that all document formats are valid.")
 
         # Select optimal format for reports which appear more than once.
-        self._df['filename_without_extension'] = self._df['full_filename'].str.split(pat='.', regex=False).str[0]
-        self._df['file_type'] = self._df['full_filename'].str.split(pat='.', regex=False).str[1]
+        filename_split = self._df['full_filename'].str.split(pat='.', regex=False)
+        self._df['filename_without_extension'] = filename_split.str[0]
+        self._df['file_type'] = filename_split.str[1]
         self._df = self._df.groupby(['filename_without_extension']).apply(lambda x: _choose_optimal_format(x))['full_filename']
-        self._df.index = self._df.index.rename("paper")
         self._df = pd.DataFrame(self._df)
 
     def _decode_text(self, text_encoding='UTF-8'):
@@ -120,6 +118,9 @@ class JournalDocumentReader:
             raise NotImplementedError("The method _pickle_df was called by an object of an unrecognized class, and cannot automatically name the cleaned,"
                                       "pickled output file. See the method definition in referee_reports.document_readers.JournalDocumentReader.")
 
+        # At this point, we no longer have use for full_filename.
+        self._df = self._df.drop(columns=['full_filename'])
+
         # Momentarily save as an unpickled CSV.
         unpickled_path = os.path.join(self._cleaned_pickled_output_directory, filename)
         self._df.to_csv(unpickled_path)
@@ -142,40 +143,21 @@ class PaperReader(JournalDocumentReader):
     TODO
     """
 
-    def build_df(self):  # TODO: FINISH THIS METHOD
+    def build_df(self):
         """Builds a pandas DataFrame containing the text and ID of each paper."""
-
         self._validate_raw_data()
         self._filter_duplicate_documents()
+        self._format_index()
         self._decode_text()
         self._remove_jpube_cover_pages()
-
-        # TODO: Below
-
         self._restrict_to_intro()
+        self._tokenize_text()
+        self._pickle_df()
+        # TODO: Drop paper 19-00063, which is a revision and should not have been included in the sample.
 
-        self._remove_thank_yous()
-
-        self._tokenize_text(remove_stopwords=True, report=False)
-
-        self.df = self._df.drop(columns=['folder'])
-
-        # Extract paper number from filename as a separate column.
-        split_filename_without_extension = self.df['filename'].str.split(pat='.').str[0].str.split(pat='-')
-        self.df['paper'] = split_filename_without_extension.str[2].str.cat(split_filename_without_extension.str[3],
-                                                                           sep='-')
-        self.df['file_type'] = self.df['filename'].str.split(pat='.').str[1]
-
-        # Drop unneeded columns.
-        self.df = self.df.drop(columns=['introduction_length', 'introduction_sentences', 'sentence_tokenized_text', 'cutoff', 'bytes', 'filepath',
-                                        'text', 'tokenized_text'])  # TODO: Re-add filename to this list
-
-        # Drop reports about correspond to paper 19-00063, which is a revision and should not have been included in the sample.
-        print("Reports associated with paper 19-00163 have been dropped from the sample. This paper is a revision and should not have been included")
-        self.df = self.df.drop(index=self.df.loc[self.df['paper'] == '19-00163'].index).reset_index(drop=True)
-
-        # Save all columns to a pickled CSV.
-        self._pickle_df('papers.txt')
+    def _format_index(self):
+        self._df.index = ['-'.join(paper.split('-')[-2:]) for paper in self._df.index]
+        self._df.index = self._df.index.rename("paper")
 
     def _remove_jpube_cover_pages(self):
         def _remove_jpube_cover_page_from_single_paper(row, split_on):
@@ -254,78 +236,43 @@ class PaperReader(JournalDocumentReader):
             restricted_sentences.append(sentences[:int(cutoff)])
         self._df['raw_text'] = pd.Series(restricted_sentences, index=self._df.index).str.join(" ")
 
-    def _get_string_with_most_occurrences(self, strings: List[str], keywords: List[str]):
-        """A helper function which returns the string in a list of strings which contains the most occurrences of specified keywords.
-
-        Args:
-            strings (List[str]): The list of strings from which to choose the string with most occurrences.
-            keywords (List[str]): The list of keywords whose appearances will be tallied.
-
-        Returns:
-            str: The string in strings which contains the most occurrences of keywords, unless:
-                    -strings has length less than 3
-                    -the string in strings with the maximum number of occurrences has less than 2 occurrences of keywords.
-                    -the returned string contains "Introduction"
-        """
-        # Keep track of the number of keywords appearing in each string.
-        occurences_in_each_string = []
-
-        # If we could not split string on "\n\n", return a string which is certainly not present in the paper so we do not replace anything.
-        if len(strings) < 3:
-            return "This string is not present in the paper. Returning it so that no text is erroneously deleted."
-
-        for string in strings:
-            # Keep track of number of keywords appearing in current string
-            occurences_in_current_string = 0
-            # Count occurrences of each keyword.
-            for keyword in keywords:
-                occurences_in_current_string += string.lower().count(keyword.lower())
-            occurences_in_each_string.append(occurences_in_current_string)
-
-        # Only remove the string with the most occurrences if it has at least 3 occurrences; otherwise, remove nothing.
-        if np.max(occurences_in_each_string) < 2:
-            return "This string is not present in the paper. Returning it so that no text is erroneously deleted."
-
-        index_of_string_with_most_occurrences = np.argmax(occurences_in_each_string)
-
-        # Checks to ensure we are not erroneously removing paper content.
-        if "Introduction" in strings[index_of_string_with_most_occurrences]:
-            return "This string is not present in the paper. Returning it so that no text is erroneously deleted."
-
-        return strings[index_of_string_with_most_occurrences]
-
 
 class ReportReader(JournalDocumentReader):
+    """
+    TODO
+    """
+    _referee_characteristics_file: str
 
-    def __init__(self, raw_pickled_documents_directory: str, cleaned_pickled_output_directory: str, path_to_output: str, path_to_referee_characteristics: str):
-        JournalDocumentReader.__init__(self, raw_pickled_documents_directory, cleaned_pickled_output_directory, path_to_output)
-        self.path_to_referee_characteristics = path_to_referee_characteristics
+    def __init__(self, raw_pickled_documents_directory: str, cleaned_pickled_output_directory: str, referee_characteristics_file: str):
+        JournalDocumentReader.__init__(self, raw_pickled_documents_directory, cleaned_pickled_output_directory)
+        self._referee_characteristics_file = referee_characteristics_file
 
     def build_df(self):
         """Builds a pandas DataFrame containing text of each report."""
-
+        self._validate_raw_data()
+        self._filter_duplicate_documents()
+        self._format_index()
         self._decode_text()
+        self._merge_referee_characteristics()
+        self._tokenize_text()
+        self._pickle_df()
 
-        self._tokenize_text(remove_stopwords=True, report=True)
+    def _format_index(self):
+        self._df = self._df.reset_index()
+        unformatted_index = self._df['filename_without_extension'].str.split(" ")
+        self._df = self._df.drop(columns=['filename_without_extension'])
+        self._df.loc[:, 'paper'] = unformatted_index.str[0]
+        self._df.loc[:, 'refnum'] = unformatted_index.str[2].astype(int)
+        self._df = self._df.set_index(['paper', 'refnum'])
 
-        self.df = self._df.drop(columns=['folder'])
-
-        # Extract referee number and paper number from filename as a separate column.
-        paperid_refid_separated = self.df['filename'].str.split(pat='.').str[0].str.split(pat=' ref ')
-        self.df['paper'] = paperid_refid_separated.str[0]
-        self.df['refnum'] = paperid_refid_separated.str[1].astype('int64')
-
-        self.df['file_type'] = self.df['filename'].str.split(pat='.').str[1]
-
-        # Many-to-one merge with referee characteristics.
-        characteristics_df = pd.read_csv(self.path_to_referee_characteristics)
-        self.df = self.df.merge(characteristics_df,
-                                how='inner',
-                                left_on=['paper', 'refnum'],
-                                right_on=['paper', 'refnum'],
-                                suffixes=('_left', '_right'),
-                                validate='1:1')
-
-        # Save all columns to pickled CSV.
-        self.df = self.df.drop(columns=['tokenized_text', 'filename', 'filepath', 'bytes', 'text'])
-        self._pickle_df('reports.txt')
+    def _merge_referee_characteristics(self):
+        referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper', 'refnum'])
+        number_of_reports = len(self._df)
+        self._df = pd.merge(self._df, referee_characteristics_df, right_index=True, left_index=True,
+                            validate='1:1', how='inner')
+        number_of_reports_merged_with_referee_characteristics = len(self._df)
+        if number_of_reports != number_of_reports_merged_with_referee_characteristics:
+            raise FileNotFoundError(f"A total of "
+                                    f"{number_of_reports - number_of_reports_merged_with_referee_characteristics}"
+                                    f"referee reports could not be merged with referee characteristics. Check that"
+                                    f"all referee reports have a corresponding row in referee_gender_nonames.csv")

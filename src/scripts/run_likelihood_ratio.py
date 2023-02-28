@@ -22,7 +22,7 @@ print("CALCULATING LIKELIHOOD RATIOS (MODEL 0)")
 calculate_likelihood_ratios_on_entire_vocabulary(pickled_papers=PICKLED_PAPERS,
                                                  pickled_reports=PICKLED_REPORTS,
                                                  output_paths=[UNIGRAMS_OUTPUT, BIGRAMS_OUTPUT, TRIGRAMS_OUTPUT],
-                                                 seed=7,
+                                                 _seed=7,
                                                  model_type="Likelihood Ratio Model 0")
 
 
@@ -34,7 +34,7 @@ print("CALCULATING LIKELIHOOD RATIOS (MODEL 1)")
 calculate_likelihood_ratios_on_entire_vocabulary(pickled_papers=PICKLED_PAPERS,
                                                  pickled_reports=PICKLED_REPORTS,
                                                  output_paths=[UNIGRAMS_OUTPUT, BIGRAMS_OUTPUT, TRIGRAMS_OUTPUT],
-                                                 seed=7,
+                                                 _seed=7,
                                                  model_type="Likelihood Ratio Model 1")
 
 
@@ -45,7 +45,7 @@ print("CALCULATING LIKELIHOOD RATIOS (MODEL 2)")
 calculate_likelihood_ratios_on_entire_vocabulary(pickled_papers=PICKLED_PAPERS,
                                                  pickled_reports=PICKLED_REPORTS,
                                                  output_paths=[UNIGRAMS_OUTPUT, BIGRAMS_OUTPUT, TRIGRAMS_OUTPUT],
-                                                 seed=7,
+                                                 _seed=7,
                                                  model_type="Likelihood Ratio Model 2")
 
 

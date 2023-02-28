@@ -24,8 +24,8 @@ def test__filter_duplicate_documents(journal_document_reader):
                                                                             'doc_2.docx.pkl', 'doc_2.pdf.pkl', 'doc_2.txt.pkl', 'doc_2.md.pkl']})
     journal_document_reader._filter_duplicate_documents()
     actual = journal_document_reader._df
-    expected = pd.DataFrame.from_dict({'paper': ['doc_1', 'doc_2'],
-                                       'full_filename': ['doc_1.pdf.pkl', 'doc_2.pdf.pkl']}).set_index('paper')
+    expected = pd.DataFrame.from_dict({'filename_without_extension': ['doc_1', 'doc_2'],
+                                       'full_filename': ['doc_1.pdf.pkl', 'doc_2.pdf.pkl']}).set_index('filename_without_extension')
     pd.testing.assert_frame_equal(actual, expected)
 
     # Test on a DataFrame containing three identical fake files saved in different formats, none of which are given as arguments in the method call.
@@ -72,7 +72,7 @@ def test__pickle_df(journal_document_reader):
     journal_document_reader._tokenize_text()
     journal_document_reader._pickle_df()
     actual = pd.read_csv(StringIO(pkldir.decode("../../data/test_assets/pickled_cleaned_test_data/journal_documents.txt.pkl").decode('utf-8')),
-                         index_col='paper')
+                         index_col='filename_without_extension')
     expected = journal_document_reader._df
     pd.testing.assert_frame_equal(actual, expected)
     assert not os.path.isfile("../../data/test_assets/pickled_cleaned_test_data/journal_documents.txt")
@@ -99,7 +99,7 @@ def test__pickle_df(journal_document_reader):
 #                     'disclaimer',
 #                     'grant',
 #                     '@']
-#     actual = (paper_reader_with_nathans_paper_only.df['text']
+#     actual = (paper_reader_with_nathans_paper_only._df['text']
 #     .str.split(pat="\n\n")
 #     .apply(lambda strings: paper_reader_with_nathans_paper_only._get_string_with_most_occurrences(strings=strings,
 #                                                                                                   keywords=keywords))
@@ -112,12 +112,12 @@ def test__pickle_df(journal_document_reader):
 #     paper_reader_with_test_papers_only.build_df()
 #
 #     with open("/data/home/ashanmu1/Desktop/refereebias/code/cleaned_introductions.txt", 'w') as f:
-#         for text, filename in zip(paper_reader_with_test_papers_only.df['cleaned_text'], paper_reader_with_test_papers_only.df['filename']):
+#         for text, filename in zip(paper_reader_with_test_papers_only._df['cleaned_text'], paper_reader_with_test_papers_only._df['filename']):
 #             f.write(filename + "\n" + text + "\n\n\n\n")
 #
 #     paper_reader_with_test_papers_only._decode_text()
 #     with open("/data/home/ashanmu1/Desktop/refereebias/code/firm_choices.txt", 'w') as f:
-#         f.write(paper_reader_with_test_papers_only.df.loc[paper_reader_with_test_papers_only.df['filename'] == 'FirmChoices-RES.pdf.pkl']['text'].iloc[0])
+#         f.write(paper_reader_with_test_papers_only._df.loc[paper_reader_with_test_papers_only._df['filename'] == 'FirmChoices-RES.pdf.pkl']['text'].iloc[0])
 #
 #
 # def test__remove_thank_yous(paper_reader_with_nathans_paper_only):
@@ -125,14 +125,14 @@ def test__pickle_df(journal_document_reader):
 #     keywords = ['keyword 1', 'keyword 2']
 #
 #     # Define dummy data.
-#     paper_reader_with_nathans_paper_only.df['text'] = pd.Series(["Section 1 of Text\n\nSection 2 of Text keyword 1 keyword 2\n\nSection 3 of Text",
+#     paper_reader_with_nathans_paper_only._df['text'] = pd.Series(["Section 1 of Text\n\nSection 2 of Text keyword 1 keyword 2\n\nSection 3 of Text",
 #                                                                  "Section 1 of Text\n\nSection 2 of Text keyword 1\n\nSection 3 of Text\n\nSection 4 of Text keyword 1 keyword 1\n\nSection 5 of Text"],
 #                                                                 index=range(2))
 #
 #     paper_reader_with_nathans_paper_only._remove_thank_yous(keywords=keywords)
 #     expected = pd.Series(["Section 1 of Text\n\n\n\nSection 3 of Text",
 #                           "Section 1 of Text\n\nSection 2 of Text keyword 1\n\nSection 3 of Text\n\n\n\nSection 5 of Text"])
-#     actual = paper_reader_with_nathans_paper_only.df['text']
+#     actual = paper_reader_with_nathans_paper_only._df['text']
 #     pd.testing.assert_series_equal(actual, expected, check_names=False)
 
 
@@ -154,7 +154,7 @@ def test__pickle_df(journal_document_reader):
 #     journal_document_reader._restrict_to_intro()
 #
 #     # Check that all introductions are of a reasonable length.
-#     for i in range(len(journal_document_reader.df['introduction_length'])):
-#         if not (35 < journal_document_reader.df['introduction_length'].iloc[i] < 200):
+#     for i in range(len(journal_document_reader._df['introduction_length'])):
+#         if not (35 < journal_document_reader._df['introduction_length'].iloc[i] < 200):
 #             print("Paper number " + str(i) + "'s introduction is " + str(
-#                 journal_document_reader.df['introduction_length'].iloc[i]) + " sentences long. Note that this may not be an error.")
+#                 journal_document_reader._df['introduction_length'].iloc[i]) + " sentences long. Note that this may not be an error.")
