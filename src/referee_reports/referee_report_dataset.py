@@ -48,31 +48,53 @@ class RefereeReportDataset:
             output_directory (str): _description_
             seed (int): _description_
         """
-        self._df = pd.DataFrame()
+        # noinspection PyTypeChecker
         self._reports_df = pd.read_csv(io.StringIO(pkldir.decode(cleaned_pickled_reports_file).decode('utf-8')),
                                        index_col=['paper', 'refnum'])
+        # noinspection PyTypeChecker
         self._papers_df = pd.read_csv(io.StringIO(pkldir.decode(cleaned_pickled_papers_file).decode('utf-8')),
                                       index_col='paper')
         self._output_directory = output_directory
         self._seed = seed
+        self._df = pd.DataFrame(index=self._reports_df.index)
         np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
 
-        self.report_dtm = pd.DataFrame()
-        self.report_vocabulary = []
-        self.tf_reports = pd.DataFrame()
-        self.tf_papers = pd.DataFrame()
-        self.tf_reports_adjusted = pd.DataFrame()
-        self.models = {}
-        self.ngrams = None
+        # self.report_dtm = pd.DataFrame()
+        # self.report_vocabulary = []
+        # self.tf_reports = pd.DataFrame()
+        # self.tf_papers = pd.DataFrame()
+        # self.tf_reports_adjusted = pd.DataFrame()
+        # self.models = {}
+        # self.ngrams = None
 
-    def build_df(self, text_representation: str, ngrams: int, restrict_to_mixed_gender_referees: bool):
+    def build_df(self, text_representation: str, ngrams: int, restrict_to_papers_with_mixed_gender_referees: bool, balance_sample_by_gender: bool):
 
         self._format_non_vocabulary_columns()
-        self._build_dtm(text_representation)
+        # TODO: Restrict sample to mix-gendered referee groups if desired.
+        if restrict_to_papers_with_mixed_gender_referees:
+            self._restrict_to_mixed_gender_referees()
+        self._build_dtm(text_representation, ngrams)
+        self._merge_with_referee_characteristics()
+        if balance_sample_by_gender:
+            self._balance_sample_by_gender()
 
     def _format_non_vocabulary_columns(self):
         self._reports_df.columns = [f"_{column}_" for column in self._reports_df.columns]
         self._papers_df.columns = [f"_{column}_" for column in self._papers_df.columns]
+
+    def _restrict_to_papers_with_mixed_gender_referees(self):  # TODO TODO TODO
+        # Get the portion of each paper's referees who are female.
+        refereeship_gender_breakdown = self._df.groupby(level=0)['_female_'].mean()
+
+        # Restrict series to papers with at least one male referee and at least one female referee.
+        refereeship_gender_breakdown = refereeship_gender_breakdown.loc[(refereeship_gender_breakdown != 0) & (refereeship_gender_breakdown != 1)]
+
+        # Get the papers which meet these criteria.
+        mixed_gender_papers = refereeship_gender_breakdown.index
+        print(mixed_gender_papers)
+
+        self._df = self._df.loc[mixed_gender_papers, :]
+        print(self._df)
 
     def _build_dtm(self, text_representation: str, ngrams: int):
         # Fit a CountVectorizer to the reports.
@@ -84,9 +106,9 @@ class RefereeReportDataset:
             dtm = vectorizer.transform(self._reports_df['_cleaned_text_']).toarray()
         elif text_representation == 'NR':
             dtm = vectorizer.transform(self._reports_df['_cleaned_text_']).toarray()
-            report_lengths = dtm.sum(axis=1)
-            dtm = pd.DataFrame(dtm).div(pd.Series(report_lengths), axis=0)
-            dtm = dtm.values
+            report_lengths = np.sum(dtm, axis=1)
+            dtm = dtm / report_lengths[:, np.newaxis]  # Divide each element in row i of dtm (2-D) by row i of report_lengths (1-D)
+
         elif text_representation == 'R-tilde':
             raise NotImplementedError("TODO: Implement R-tilde.")
         elif text_representation == 'NR/NP':
@@ -96,51 +118,19 @@ class RefereeReportDataset:
 
         # Concatenate DTM with the rest of the data.
         dtm = pd.DataFrame(dtm, self._reports_df.index, columns=vectorizer.get_feature_names_out())
-        self._df = pd.concat([self._reports_df, dtm], axis=1)
+        self._df = pd.concat([self._df, dtm], axis=1)
+
+    def _merge_with_referee_characteristics(self):
+        referee_characteristics = self._reports_df.drop(columns=['_raw_text_', '_cleaned_text_'])
+        self._df = pd.concat([self._df, referee_characteristics], axis=1)
+
+    def _balance_sample_by_gender(self):
+        # TODO
 
 
 
-    def build_df(self,
-                 adjust_reports_with_papers: bool,
-                 normalize_documents_by_length: bool,
-                 restrict_to_papers_with_mixed_gender_referees: bool,
-                 balance_sample_by_categorical_column: str = None,
-                 ngrams: int = 1,
-                 min_df: int = 1,
-                 max_df: float = 1.0):
-        self.ngrams = ngrams
 
-        # Merge paper characteristics and referee characteristics.
-        self._df = self.report_df.merge(self.paper_df,
-                                        how='inner',
-                                        left_on='paper',
-                                        right_on='paper',
-                                        suffixes=('_report', '_paper'),
-                                        validate='m:1')
-        self._df = self._df.drop(columns=['Unnamed: 0_report', 'Unnamed: 0_paper'])
-
-        # Add names to columns not indicating word counts so that they can be differentiated from word count variables. 
-        for column in self._df.columns:
-            self._df = self._df.rename(columns={column: "_" + column + "_"})
-
-        # Drop unneeded columnns. 
-        self._df = self._df.drop(columns=['_file_type_report_', '_file_type_paper_'])
-
-        # Save paper ID, referee ID, recommendation, and decision as categorical data.
-        for column in ['_paper_', '_refnum_', '_recommendation_', '_decision_']:
-            self._df[column] = self._df[column].astype('category')
-
-        if restrict_to_papers_with_mixed_gender_referees:
-            self._restrict_to_papers_with_mixed_gender_referees()
-
-        self._build_tf_matrices(adjust_reports_with_papers=adjust_reports_with_papers,
-                                ngrams=ngrams,
-                                min_df=min_df,
-                                max_df=max_df,
-                                normalize_documents_by_length=normalize_documents_by_length)
-
-        if balance_sample_by_categorical_column != None:
-            self._balance_sample_by_categorical_column(balance_sample_by_categorical_column)
+# BELOW: OLD
 
     def _balance_sample_by_categorical_column(self, column_to_balance):
         # Get unique values and their counts for the column to balance on.
@@ -867,15 +857,7 @@ class RefereeReportDataset:
         else:
             self._df = pd.concat([self._df, column], axis=1)
 
-    def _restrict_to_papers_with_mixed_gender_referees(self):
-        # Get the portion of each paper's referees who are female.
-        refereeship_gender_breakdown = pd.Series(self._df.groupby('_paper_', observed=True)['_female_'].transform('mean'),
-                                                 name='gender_breakdown')
 
-        # Drop rows where 0% or 100% of referees are female.
-        all_female_or_all_male = refereeship_gender_breakdown.loc[(refereeship_gender_breakdown == 0) | (refereeship_gender_breakdown == 1)]
-
-        self._df = self._df.drop(index=all_female_or_all_male.index).reset_index(drop=True)
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],

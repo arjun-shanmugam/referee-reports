@@ -267,6 +267,11 @@ class ReportReader(JournalDocumentReader):
 
     def _merge_referee_characteristics(self):
         referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper', 'refnum'])
+
+        # Remove any trailing/leading whitespace in the recommendation or decision columns.
+        referee_characteristics_df.loc[:, 'recommendation'] = referee_characteristics_df['recommendation'].str.strip()
+        referee_characteristics_df.loc[:, 'decision'] = referee_characteristics_df['decision'].str.strip()
+
         number_of_reports = len(self._df)
         self._df = pd.merge(self._df, referee_characteristics_df, right_index=True, left_index=True,
                             validate='1:1', how='inner')
