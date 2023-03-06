@@ -91,10 +91,9 @@ class RefereeReportDataset:
 
         # Get the papers which meet these criteria.
         mixed_gender_papers = refereeship_gender_breakdown.index
-        print(mixed_gender_papers)
 
+        # Restrict the DataFrame to only those papers.
         self._df = self._df.loc[mixed_gender_papers, :]
-        print(self._df)
 
     def _build_dtm(self, text_representation: str, ngrams: int):
         # Fit a CountVectorizer to the reports.
@@ -125,110 +124,35 @@ class RefereeReportDataset:
         self._df = pd.concat([self._df, referee_characteristics], axis=1)
 
     def _balance_sample_by_gender(self):
-        # TODO
+        oversampled_gender = self._df['_female_'].value_counts().idxmax()  # Is 1 if females are oversampled, 0 if males are oversampled.
+        imbalance = self._df['_female_'].value_counts().loc[oversampled_gender] - self._df['_female_'].value_counts().loc[1 - oversampled_gender]
+        reports_of_oversampled_gender = self._df.loc[self._df['_female_'] == oversampled_gender, :].copy()
+        papers_refereed_by_oversampled_gender = pd.Series(reports_of_oversampled_gender.index.get_level_values(0).value_counts().index)
+        papers_refereed_by_oversampled_gender = papers_refereed_by_oversampled_gender.sample(frac=1, random_state=self._seed)  # Shuffle papers.
+
+        num_papers_dropped = 0
+        for paper in papers_refereed_by_oversampled_gender:
+            reports_associated_with_current_paper = reports_of_oversampled_gender.loc[paper, :]
+            # Get the number of reports associated with the current paper that were written by the oversampled gender.
+            num_papers = len(reports_associated_with_current_paper)
+            if num_papers == 1:  # If there is only one report written by the oversampled gender in the current paper group...
+                continue  # ...do not drop this report.
+            else:  # Otherwise, randomly select one paper and drop
+                report_to_drop = reports_associated_with_current_paper.sample(n=1, random_state=self._seed).index.tolist()[0]
+
+
+
+                self._df = self._df.drop(index=(paper, report_to_drop))
+                num_papers_dropped += 1
+            if num_papers_dropped == imbalance:
+                break  # Break out of loop once we have dropped enough papers.
 
 
 
 
 # BELOW: OLD
 
-    def _balance_sample_by_categorical_column(self, column_to_balance):
-        # Get unique values and their counts for the column to balance on.
-        value_counts = self._df[column_to_balance].value_counts()
 
-        # Warn if provided column appears continuous.                                            
-        if len(value_counts) > 6:
-            warnings.warn("There are more than 6 unique values of the provided column. Are you sure that it is categorical?")
-
-        # Check that each class appears frequently enough for us to balance observations by column.
-        minimum_count = value_counts.min()
-        if minimum_count < 1 / (2 * len(value_counts)) * len(self._df):
-            warnings.warn(
-                "The specified column contains a class which account for a small percentage of total observations. Balancing by this class would hugely reduce sample size.")
-        # Balance observations.
-        for index, count in value_counts.iteritems():
-            # No need to drop observations which come from the lowest-frequency class. 
-            if count == minimum_count:
-                continue
-            imbalance = count - minimum_count
-            # We want to draw n random rows, where n is equal to the difference between the count of the current value
-            # and the count of the least-frequent value.
-            oversampled_rows = self._df.loc[self._df[column_to_balance] == index]
-            num_rows_dropped = 0
-            # Choose rows to drop within-paper groups at random.
-            papers = self._df['_paper_'].value_counts().index.tolist()
-            random.Random(self._seed).shuffle(papers)
-            for paper in cycle(papers):
-                current_paper_rows = oversampled_rows.loc[oversampled_rows['_paper_'] == paper]
-                if len(current_paper_rows) < 2:  # Do not drop oversampled row if it is the only one within its paper group.
-                    continue
-                else:
-                    random_row_index = current_paper_rows.sample(n=1, random_state=self._seed).index
-                    self._df = self._df.drop(index=random_row_index)
-                    num_rows_dropped += 1
-                if num_rows_dropped == imbalance:
-                    break  # Break out of this loop and consider the next oversampled category.
-
-        self._df = self._df.reset_index(drop=True)
-
-
-    def _build_tf_matrices(self, adjust_reports_with_papers, ngrams, min_df, max_df, normalize_documents_by_length=False):
-        # Fit a CountVectorizer to the reports.
-        vectorizer = CountVectorizer(min_df=min_df, max_df=max_df, ngram_range=(ngrams, ngrams))
-        vectorizer = vectorizer.fit(self._df['_cleaned_text_report_'])
-
-        # Store CountVectorizer's vocabulary.
-        self.report_vocabulary = list(
-            vectorizer.get_feature_names())  # NOTE: The version of Scikit-learn installed on this machine is old. In new versions, .get_feature_names() has been deprecated.
-
-        # Transform the reports and the papers into their T.F.V. representations.
-        self.tf_reports = vectorizer.transform(self._df['_cleaned_text_report_']).toarray()
-        self.tf_papers = vectorizer.transform(self._df['_cleaned_text_paper_']).toarray()
-
-        # Convert the T.F.V. to DataFrames.
-        self.tf_reports = pd.DataFrame(self.tf_reports, index=self._df.index, columns=self.report_vocabulary)
-        self.tf_papers = pd.DataFrame(self.tf_papers, index=self._df.index, columns=self.report_vocabulary)
-
-        # Normalize documents by length if specified.
-        if normalize_documents_by_length:
-            if adjust_reports_with_papers:
-                self.tf_reports = self.tf_reports + 1  # Laplace smooth reports so we can calculate NR_ij/NP_j.
-                self.tf_papers = self.tf_papers + 1  # Laplace smooth papers so we can calculate NR_ij/NP_j.
-
-                report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
-                self.tf_reports = self.tf_reports.div(report_lengths, axis=0)
-                paper_lengths = self.tf_papers.sum(axis=1)  # Calculate NP_j
-                self.tf_papers = self.tf_papers.div(paper_lengths, axis=0)
-
-                # Calculate NR_ij / NP_j.
-                self.tf_reports_adjusted = self.tf_reports / self.tf_papers
-
-                # Produce final DataFrame by concatenating normalized, paper-adjusted report frequencies with other data.
-                self._df = pd.concat([self._df, self.tf_reports_adjusted], axis=1)
-            else:
-                report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
-                self.tf_reports = self.tf_reports.div(report_lengths, axis=0)
-
-                # Produce final DataFrame by concatenating normalized report frequencies with other data.
-                self._df = pd.concat([self._df, self.tf_reports], axis=1)
-
-        else:
-            if adjust_reports_with_papers:
-                # Calculate the reports T.F.V., normalized by the papers T.F.V.
-                self.tf_reports_adjusted = (self.tf_reports - self.tf_papers)
-
-                # Negative values indicate that a word does not appear in the report, but does appear in the corresponding paper.
-                # Replace with 0.
-                self.tf_reports_adjusted[self.tf_reports_adjusted < 0] = 0
-
-                # Concatenate paper-adjusted wordcounts with other data.
-                self._df = pd.concat([self._df, self.tf_reports_adjusted], axis=1)
-            else:
-                # Concatenate report word counts with other data.
-                self._df = pd.concat([self._df, self.tf_reports], axis=1)
-
-        # Drop strings containing cleaned text.
-        self._df = self._df.drop(columns=['_cleaned_text_report_', '_cleaned_text_paper_'])
 
     def ols_regress(self, y, X, model_name, add_constant, logistic, log_transform, standardize):
         # Check that specified independent, dependent variables are valid.

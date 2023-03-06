@@ -87,7 +87,23 @@ def test__restrict_to_papers_with_mixed_gender_referees(referee_report_dataset):
                                index=pd.MultiIndex.from_tuples([('99-99998', 1), ('99-99998', 2), ('99-99998', 3), ('99-99998', 4)]))
     expected_df.index = expected_df.index.rename(['paper', 'refnum'])
     pd.testing.assert_frame_equal(actual_df, expected_df)
-#
+
+def test__balance_sample_by_gender(referee_report_dataset):
+    # Test that the sample is balanced correctly by gender.
+    referee_report_dataset._df = pd.DataFrame([1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, ],
+                                              columns=['_female_'],
+                                              index=pd.MultiIndex.from_tuples([('99-99996', 1), ('99-99996', 2), ('99-99996', 3), ('99-99996', 4),
+                                                                               ('99-99997', 1), ('99-99997', 2), ('99-99997', 3), ('99-99997', 4),
+                                                                               ('99-99998', 1), ('99-99998', 2), ('99-99998', 3), ('99-99998', 4),
+                                                                               ('99-99999', 1), ('99-99999', 2), ('99-99999', 3), ('99-99999', 4)]))
+    referee_report_dataset._df.index = referee_report_dataset._df.index.rename(['paper', 'refnum'])
+    referee_report_dataset._balance_sample_by_gender()
+    # Assert that reports dropped are associated with paper 99-99996 and 99-99997 (it has only male referees) and not the other papers.
+    assert len(referee_report_dataset._df.loc['99-99996', :]) == 3
+    assert len(referee_report_dataset._df.loc['99-99997', :]) == 3
+    assert len(referee_report_dataset._df.loc['99-99998', :]) == 4
+    assert len(referee_report_dataset._df.loc['99-99999', :]) == 4
+
 # def test_build_df(referee_report_dataset):
 #     referee_report_dataset
 #     # referee_report_dataset.build_df(normalize_reports_with_papers=True)
