@@ -752,19 +752,15 @@ class RefereeReportDataset:
         with open(os.path.join(self.path_to_output, filename + ".html"), "w") as html_output_file:
             html_output_file.write(html)
 
-    def _validate_columns(self, y, X, check_length=True):
-        columns = self._df.columns.tolist()
-
-        if (y not in columns):
-            error_msg = "The specified dependent variable is not a variable in the dataset."
-            raise ValueError(error_msg)
-        elif (not set(X).issubset(set(columns))):
-            error_msg = "One or more of the specified independent variables is not a variable in the dataset."
-            raise ValueError(error_msg)
-        elif len(X) == 0 and check_length == True:
-            error_msg = "You must specify at least one independent variable."
-            raise ValueError(error_msg)
-
+    def _validate_columns(self, y, X):
+        if y not in self._df.columns:
+            raise ValueError("The specified dependent variable is not a variable in the dataset.")
+        elif not set(X).issubset(set(self._df.columns)):
+            bad_variables = set(X) - set(self._df.columns)
+            raise ValueError(f"Specified independent variable(s) {bad_variables} are not present in the dataset.")
+        elif len(X) == 0:
+            raise ValueError("You must specify at least one dependent variable.")
+        
     def add_column(self, column):
         if not isinstance(column, pd.Series):
             error_msg = "The passed column is not a pandas Series."
