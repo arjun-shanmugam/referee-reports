@@ -7,7 +7,7 @@ class NLPConstants:
                               'any', "shan't", 'where', 'i', 'whom', 'the', "you'd", 'under', 'don', 'only', 'while',
                               'after', 'what', "you've", 'until', 'yourselves', 'than', 'doesn', 'does', 'so', "it's",
                               've', 'to', 'own', 'wasn', 'weren', 'isn', 'theirs', 'himself', "hadn't", "hadn't", 'in',
-                              'of', 'these', 'a', "doesn't", 'needn', 'because', 'aren', "couldn't", 'hasn', 't', 'y',
+                              'of', 'these', 'a', "doesn't", 'needn', 'because', 'aren', "couldn't", 'hasn', 't', '_y_data',
                               'up', 'when', 'few', 'this', 'will', 'all', 'hers', 'll', "mightn't", 'between', 'their',
                               'be', 'with', 'myself', 'being', 'he', 'did', 'about', 'as', 'but', 'shouldn', 'him',
                               'some', 'herself', 'before', 'there', 'very', 'more', 'over', 'on', "isn't", 'have',

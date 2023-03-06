@@ -23,7 +23,7 @@ calculate_likelihood_ratios_on_entire_vocabulary(pickled_papers=PICKLED_PAPERS,
                                                  pickled_reports=PICKLED_REPORTS,
                                                  output_paths=[UNIGRAMS_OUTPUT, BIGRAMS_OUTPUT, TRIGRAMS_OUTPUT],
                                                  _seed=7,
-                                                 model_type="Likelihood Ratio Model 0")
+                                                 _model_type="Likelihood Ratio Model 0")
 
 
 
@@ -35,7 +35,7 @@ calculate_likelihood_ratios_on_entire_vocabulary(pickled_papers=PICKLED_PAPERS,
                                                  pickled_reports=PICKLED_REPORTS,
                                                  output_paths=[UNIGRAMS_OUTPUT, BIGRAMS_OUTPUT, TRIGRAMS_OUTPUT],
                                                  _seed=7,
-                                                 model_type="Likelihood Ratio Model 1")
+                                                 _model_type="Likelihood Ratio Model 1")
 
 
 UNIGRAMS_OUTPUT = "/data/home/ashanmu1/Desktop/refereebias/output/likelihood_ratios_model_2/unigrams/"
@@ -46,7 +46,7 @@ calculate_likelihood_ratios_on_entire_vocabulary(pickled_papers=PICKLED_PAPERS,
                                                  pickled_reports=PICKLED_REPORTS,
                                                  output_paths=[UNIGRAMS_OUTPUT, BIGRAMS_OUTPUT, TRIGRAMS_OUTPUT],
                                                  _seed=7,
-                                                 model_type="Likelihood Ratio Model 2")
+                                                 _model_type="Likelihood Ratio Model 2")
 
 
                                                  """

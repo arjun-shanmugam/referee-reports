@@ -1,57 +1,94 @@
 """Defines the Regression class, which implements functionality that is common to OLSRegression, Regularized Regression, and PanelRegression.
 """
-from typing import Any, List
+from typing import List
 
 import numpy as np
 import pandas as pd
+import stat
 from sklearn.preprocessing import StandardScaler
 
 
 class Regression:
-    y: pd.Series
-    X: pd.DataFrame
-    standardize: bool
-    log_transform: bool
-    add_constant: bool
-    dummy_variables: List[str]
-    model_type: str
-    results_table: Any
+    _y_data: pd.Series
+    _X_data: pd.DataFrame
+    _standardize: bool
+    _log_transform: bool
+    _add_constant: bool
+    _dummy_variables: List[str]
+    _model_type: str
+    _results_table: pd.DataFrame
 
-    def get_model_type(self):
-        return self.model_type
+    def __init__(self,
+                 model_name: str,
+                 y_data: pd.Series,
+                 X_data: pd.DataFrame,
+                 add_constant: bool,
+                 logistic: bool,
+                 log_transform: bool,
+                 standardize: bool):
 
-    def get_results_table(self):
-        return self.results_table
+        self._y_data = y_data
+        self._X_data = X_data
+        self._standardize = standardize
+        self._log_transform = log_transform
+        self._add_constant = add_constant
+        if type(self) == OLSRegression:
+            self._model_type = "OLS"
+        elif type(self) == RegularizedRegression:
+            self._model_type = "Regularized"
+        else:
+            raise NotImplementedError("The method __init__ was called by an object of an unrecognized class, and the attribute _model_type"
+                                      "cannot be automatically assigned. See the method definition for Regression.__init__ for more information.")
 
-    def _preprocess_inputs(self, standardize_generated_dummies):
+        self._logistic = logistic
+        self._results_table = None
+        self._dummy_variables = None
+
+    def _preprocess_inputs(self):
         # Store numeric and categorical columns separately.
-        categorical_df = self.X.select_dtypes(exclude=['number'])
-        numeric_df = self.X.select_dtypes(include=['number'])  # Setting include to 'number' selects all numeric datatypes.
+        categorical_df = self._X_data.select_dtypes(exclude=['number'])
+        numeric_df = self._X_data.select_dtypes(include=['number'])  # Setting include to 'number' selects all numeric datatypes.
 
-        # Check that we have accounted for all columns in the provided input.
-        assert set(categorical_df.columns.tolist()).union(set(numeric_df.columns.tolist())) == set(
-            self.X.columns.tolist()), "Union of categorical columns and numeric columns does not equal the set of all input columns."
+        # Log(x+1) transform numeric variables.
+        if self._log_transform and not numeric_df.empty:
+            numeric_df = np.log(numeric_df + 1)
 
-        if self.log_transform is not None and not numeric_df.empty:
-            if self.log_transform == 'plus_one':
-                numeric_df = np.log(numeric_df + 1)
-            elif self.log_transform == 'regular':
-                numeric_df = np.log(numeric_df)
-            else:
-                raise ValueError("Please specify either 'plus_one' or 'regular' for the type of log transformation desired.")
-
-        # If requested, standardize numeric variables using a Scikit-Learn Standard Scaler.
-        if self.standardize and not numeric_df.empty:
+        # If requested, _standardize numeric variables using a Scikit-Learn Standard Scaler.
+        if self._standardize and not numeric_df.empty:
             numeric_df = pd.DataFrame(StandardScaler().fit_transform(numeric_df), columns=numeric_df.columns, index=numeric_df.index)
 
         # Generate dummies for categorical variables. For each categorical variable, dummies are generated for each category except one.
         if not categorical_df.empty:
             categorical_df = pd.get_dummies(categorical_df, prefix=categorical_df.columns, prefix_sep=": ", drop_first=True, dtype='int64')
-            if self.standardize and standardize_generated_dummies:
-                categorical_df = pd.DataFrame(StandardScaler().fit_transform(categorical_df), columns=categorical_df.columns)
 
         # Keep track of dummy variable names.
-        self.dummy_variables = categorical_df.columns.tolist()
+        self._dummy_variables = categorical_df.columns.tolist()
 
-        # Set X to the preprocessed input.
-        self.X = pd.concat([categorical_df, numeric_df], axis=1)
+        # Set _X_data to the preprocessed input.
+        self._X_data = pd.concat([categorical_df, numeric_df], axis=1)
+
+        # Add a constant column if specified.
+        if self._add_constant:
+            self._X_data.loc[:, "Constant"] = 1
+
+
+
+
+class OLSRegression(Regression):
+
+    def fit_ols(self):
+        """Fit an OLS model.
+
+        Uses StatsModels to fit an OLS model.
+        """
+        self._preprocess_inputs()
+
+        if self._logistic:
+            raise NotImplementedError("Non-regularized logistic regression has not been implemented.")
+            # self.results_table = LogitOddsWrapper(sm.Logit(self.y.astype(float), self.X.astype(float)).fit(maxiter=1000))
+        else:
+            self._results_table = sm.OLS(self._y_data.astype(float), self._X_data.astype(float)).fit()
+
+class RegularizedRegression:
+    pass
+

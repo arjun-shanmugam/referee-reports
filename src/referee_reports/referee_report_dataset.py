@@ -18,6 +18,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
+
+
 # from stargazer.stargazer import Stargazer
 #
 # from constants import OI_constants, OutputTableConstants
@@ -140,18 +142,27 @@ class RefereeReportDataset:
             else:  # Otherwise, randomly select one paper and drop
                 report_to_drop = reports_associated_with_current_paper.sample(n=1, random_state=self._seed).index.tolist()[0]
 
-
-
                 self._df = self._df.drop(index=(paper, report_to_drop))
                 num_papers_dropped += 1
             if num_papers_dropped == imbalance:
                 break  # Break out of loop once we have dropped enough papers.
 
+    def _validate_columns(self, y, X):
+        if y not in self._df.columns:
+            raise ValueError("The specified dependent variable is not a variable in the dataset.")
+        elif not set(X).issubset(set(self._df.columns)):
+            bad_variables = set(X) - set(self._df.columns)
+            raise ValueError(f"Specified independent variable(s) {bad_variables} are not present in the dataset.")
+        elif len(X) == 0:
+            raise ValueError("You must specify at least one dependent variable.")
+
+    def ols_regress(self, y: str, X: List[str], model_name: str, logistic: bool, log_transform: bool, standardize: bool):
+        # TODO
+
 
 
 
 # BELOW: OLD
-
 
 
     def ols_regress(self, y, X, model_name, add_constant, logistic, log_transform, standardize):
@@ -644,7 +655,7 @@ class RefereeReportDataset:
 
         # Store metrics in a named column.
         metrics = pd.Series(results_table.loc[OutputTableConstants.REGULARIZED_REGRESSION_METRICS.value], name="Metrics")
-        if not self.models[model_name].add_constant:
+        if not self.models[model_name]._add_constant:
             metrics = metrics.drop(labels="Constant")
         if not self.models[model_name].adjust_alpha:
             metrics = metrics.drop(labels="$\\alpha^{*}_{adjusted}$")
@@ -655,11 +666,11 @@ class RefereeReportDataset:
         metrics = metrics['index'] + ": " + metrics['Metrics'].round(3).astype(str)
 
         # Store specified dummy variables in a named column.
-        dummy_coefficients = pd.Series(results_table.loc[self.models[model_name].dummy_variables], name="Dummy Variables").reset_index()
+        dummy_coefficients = pd.Series(results_table.loc[self.models[model_name]._dummy_variables], name="Dummy Variables").reset_index()
         dummy_coefficients = dummy_coefficients['index'] + ": " + dummy_coefficients['Dummy Variables'].round(3).astype(str)
 
         # Drop non-coefficients from the Series of coefficients and sort coefficients by value.
-        non_text_coefs = self.models[model_name].dummy_variables + OutputTableConstants.REGULARIZED_REGRESSION_METRICS.value
+        non_text_coefs = self.models[model_name]._dummy_variables + OutputTableConstants.REGULARIZED_REGRESSION_METRICS.value
         coefficients_sorted = results_table.drop(labels=non_text_coefs).sort_values(ascending=False)
 
         # Get largest nonzero coefficients; concatenate them with the associated token.
@@ -752,15 +763,6 @@ class RefereeReportDataset:
         with open(os.path.join(self.path_to_output, filename + ".html"), "w") as html_output_file:
             html_output_file.write(html)
 
-    def _validate_columns(self, y, X):
-        if y not in self._df.columns:
-            raise ValueError("The specified dependent variable is not a variable in the dataset.")
-        elif not set(X).issubset(set(self._df.columns)):
-            bad_variables = set(X) - set(self._df.columns)
-            raise ValueError(f"Specified independent variable(s) {bad_variables} are not present in the dataset.")
-        elif len(X) == 0:
-            raise ValueError("You must specify at least one dependent variable.")
-        
     def add_column(self, column):
         if not isinstance(column, pd.Series):
             error_msg = "The passed column is not a pandas Series."
@@ -776,8 +778,6 @@ class RefereeReportDataset:
             raise ValueError(error_msg)
         else:
             self._df = pd.concat([self._df, column], axis=1)
-
-
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
@@ -875,7 +875,7 @@ class RefereeReportDataset:
                    This figure plots likelihood ratios by the frequency of the associated tokens across paper groups, separately for
                    the most extreme pooled sample and within-paper likelihood ratios. A \'paper group\' is defined as a group of
                    reports associated with a single paper. To produce this figure, pooled sample and within-paper likelihood ratios 
-                   are first calculated for every token. These likelihood ratios become the y-values of the points displayed in this graph.
+                   are first calculated for every token. These likelihood ratios become the _y_data-values of the points displayed in this graph.
                    Then, for each of the most extreme likelihood ratios, I calculate the portion of paper groups in which the associated
                    token appears at least once. Those values form the x-values of the points displayed in this graph. Note that both
                    plots share the same x-axis. 
