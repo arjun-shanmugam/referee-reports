@@ -181,7 +181,7 @@ class RefereeReportDataset:
                                                 standardize=standardize,
                                                 add_constant=add_constant,
                                                 logistic=logistic)
-        self.models[model_name].fit_ols()
+        self.models[model_name].fit()
 
     def regularized_regress(self,
                             y,
@@ -758,10 +758,7 @@ class RefereeReportDataset:
         with open(os.path.join(self.path_to_output, filename + ".tex"), "w") as output_file:
             output_file.write(latex)
 
-        html = stargazer.render_html()
-        # TODO: Delete this! Just for viewing purposes as I debug.
-        with open(os.path.join(self.path_to_output, filename + ".html"), "w") as html_output_file:
-            html_output_file.write(html)
+
 
     def add_column(self, column):
         if not isinstance(column, pd.Series):
