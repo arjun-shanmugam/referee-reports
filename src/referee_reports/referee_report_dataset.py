@@ -9,6 +9,7 @@ import warnings
 from itertools import cycle
 from typing import List
 
+import Stargazer as Stargazer
 import matplotlib.pyplot as plt
 import nltk
 import numpy as np
@@ -18,6 +19,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
+
+from referee_reports.models import OLSRegression
 
 
 # from stargazer.stargazer import Stargazer
@@ -40,6 +43,7 @@ class RefereeReportDataset:
     _output_directory: str
     _seed: int
     _ngrams: int
+    models: dict
 
     def __init__(self, cleaned_pickled_reports_file: str, cleaned_pickled_papers_file: str, output_directory: str, seed: int):
         """Instantiates a RefereeReportDataset object.
@@ -59,6 +63,7 @@ class RefereeReportDataset:
         self._output_directory = output_directory
         self._seed = seed
         self._df = pd.DataFrame(index=self._reports_df.index)
+        self.models = {}
         np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
 
         # self.report_dtm = pd.DataFrame()
@@ -156,32 +161,72 @@ class RefereeReportDataset:
         elif len(X) == 0:
             raise ValueError("You must specify at least one dependent variable.")
 
-    def ols_regress(self, y: str, X: List[str], model_name: str, logistic: bool, log_transform: bool, standardize: bool):
-        # TODO
-
-
-
-
-# BELOW: OLD
-
-
-    def ols_regress(self, y, X, model_name, add_constant, logistic, log_transform, standardize):
+    def ols_regress(self, model_name: str, y: str, X: List[str], add_constant: bool,
+                    logistic: bool, log_transform: bool, standardize: bool):
         # Check that specified independent, dependent variables are valid.
         self._validate_columns(y, X)
 
         # Select specified columns from DataFrame.
         dependent_variable = self._df[y]
-        independent_variables = self._df[X]
+        independent_variables = self.df[X]
 
         # Instantiate an OLS regression object.
         self.models[model_name] = OLSRegression(model_name=model_name,
-                                                y=dependent_variable,
-                                                X=independent_variables,
-                                                log_transform=log_transform,
-                                                standardize=standardize,
+                                                y_data=dependent_variable,
+                                                X_data=independent_variables,
                                                 add_constant=add_constant,
-                                                logistic=logistic)
+                                                logistic=logistic,
+                                                log_transform=log_transform,
+                                                standardize=standardize)
+
+        # Run the regression.
         self.models[model_name].fit()
+
+    def build_ols_results_table(self,
+                                filename: str,
+                                requested_models: List[str],
+                                title: str = None,
+                                show_confidence_intervals=False,
+                                dependent_variable_name=None,
+                                show_degrees_of_freedom=False,
+                                rename_covariates=None):
+        # Validate model names.
+        for model_name in requested_models:
+            if model_name not in self.models:
+                raise ValueError("A model by that name has not been estimated.")
+
+        # Validate model types.
+        for model_name in requested_models:
+            if self.models[model_name]._model_type() != "OLS":
+                raise TypeError("This function may only be used to produce output for OLS models.")
+
+        # Grab results tables.
+        results = []
+        for model_name in requested_models:
+            current_result = self.models[model_name]._results_table
+            results.append(current_result)
+
+        # Build table with Stargazer.
+        stargazer = Stargazer(results)
+
+        # Edit table.
+        if title is not None:
+            stargazer.title(title)
+        stargazer.show_confidence_intervals(show_confidence_intervals)
+        if dependent_variable_name is not None:
+            stargazer.dependent_variable_name(dependent_variable_name)
+        stargazer.show_degrees_of_freedom(show_degrees_of_freedom)
+        if rename_covariates is not None:
+            stargazer.rename_covariates(rename_covariates)
+
+        # Write LaTeX.
+        latex = stargazer.render_latex()
+
+        # Write to file.
+        with open(os.path.join(self.path_to_output, filename + ".tex"), "w") as output_file:
+            output_file.write(latex)
+
+    # BELOW: OLD
 
     def regularized_regress(self,
                             y,
@@ -699,66 +744,6 @@ class RefereeReportDataset:
                                index=False,
                                escape=False,
                                float_format="%.3f")
-
-    def build_ols_results_table(self,
-                                filename: str,
-                                requested_models: List[str],
-                                title: str = None,
-                                show_confidence_intervals=False,
-                                dependent_variable_name=None,
-                                column_titles=None,
-                                show_degrees_of_freedom=False,
-                                rename_covariates=None,
-                                covariate_order=None,
-                                lines_to_add=None,
-                                custom_notes=None):
-        # Validate model names.
-        for model_name in requested_models:
-            if not model_name in self.models:
-                raise ValueError("A model by that name has not been estimated.")
-
-        # Validate model types.
-        for model_name in requested_models:
-            if self.models[model_name].get_model_type() != "OLS":
-                raise TypeError("This function may only be used to produce output for regularized models.")
-
-        # Grab results tables.
-        results = []
-        for model_name in requested_models:
-            self._validate_model_request(model_name, expected_model_type="OLS")
-            current_result = self.models[model_name].get_results_table()
-            results.append(current_result)
-
-        # Build table with Stargazer.
-        stargazer = Stargazer(results)
-
-        # Edit table.
-        if title is not None:
-            stargazer.title(title)
-        stargazer.show_confidence_intervals(show_confidence_intervals)
-        if dependent_variable_name is not None:
-            stargazer.dependent_variable_name(dependent_variable_name)
-        stargazer.show_degrees_of_freedom(show_degrees_of_freedom)
-        if rename_covariates is not None:
-            stargazer.rename_covariates(rename_covariates)
-        if covariate_order is not None:
-            stargazer.covariate_order(covariate_order)
-        if lines_to_add is not None:
-            for line in lines_to_add:
-                stargazer.add_line(line[0], line[1], line[2])
-        if custom_notes is not None:
-            stargazer.add_custom_notes(custom_notes)
-        if column_titles is not None:
-            stargazer.custom_columns(column_titles[0], column_titles[1])
-
-        # Write LaTeX.
-        latex = stargazer.render_latex()
-
-        # Write to file.
-        with open(os.path.join(self.path_to_output, filename + ".tex"), "w") as output_file:
-            output_file.write(latex)
-
-
 
     def add_column(self, column):
         if not isinstance(column, pd.Series):
