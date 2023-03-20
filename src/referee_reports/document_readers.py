@@ -262,16 +262,30 @@ class ReportReader(JournalDocumentReader):
         unformatted_index = self._df['filename_without_extension'].str.split(" ")
         self._df = self._df.drop(columns=['filename_without_extension'])
         self._df.loc[:, 'paper'] = unformatted_index.str[0]
-        self._df.loc[:, 'refnum'] = unformatted_index.str[2].astype(int)
-        self._df = self._df.set_index(['paper', 'refnum'])
+        self._df.loc[:, 'num'] = unformatted_index.str[2].astype(int)
+        self._df = self._df.set_index(['paper', 'num'])
 
     def _merge_referee_characteristics(self):
-        referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper', 'refnum'])
-
+        referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper', 'num'])
+        
         # Remove any trailing/leading whitespace in the recommendation or decision columns.
         referee_characteristics_df.loc[:, 'recommendation'] = referee_characteristics_df['recommendation'].str.strip()
         referee_characteristics_df.loc[:, 'decision'] = referee_characteristics_df['decision'].str.strip()
+        referee_characteristics_df.loc[:, 'authorreferee'] =  referee_characteristics_df['authorreferee'].str.strip()
 
+        # Reshape dataset so that there is one row for each referee and author genders are stored in columns.
+        author_rows_mask = referee_characteristics_df['authorreferee'] == "author"
+        author_rows = referee_characteristics_df.loc[author_rows_mask, :].copy()  # Store author rows separately.
+        author_rows = (author_rows.loc[:, ['female']]  # Reshape author genders from long to wide.
+                       .reset_index()
+                       .pivot(index='paper', columns=['num'])
+                       .droplevel(0, axis=1))
+        author_rows.columns = [f"author_{column}_female" for column in author_rows.columns]
+        referee_characteristics_df = referee_characteristics_df.loc[~author_rows_mask, :].drop(columns='authorreferee')  # Drop from original DataFrame.
+        referee_characteristics_df = pd.merge(referee_characteristics_df, author_rows, right_index=True, left_index=True, validate='m:1',
+                                              how='inner')
+
+        # Merge reports with referee characteristics
         number_of_reports = len(self._df)
         self._df = pd.merge(self._df, referee_characteristics_df, right_index=True, left_index=True,
                             validate='1:1', how='inner')
