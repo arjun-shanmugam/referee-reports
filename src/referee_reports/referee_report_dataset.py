@@ -20,7 +20,7 @@ from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedKFold
 
-from referee_reports.models import OLSRegression
+from referee_reports.models import OLSRegression, RegularizedRegression
 
 
 # from stargazer.stargazer import Stargazer
@@ -79,7 +79,7 @@ class RefereeReportDataset:
         self._format_non_vocabulary_columns()
         # TODO: Restrict sample to mix-gendered referee groups if desired.
         if restrict_to_papers_with_mixed_gender_referees:
-            self._restrict_to_mixed_gender_referees()
+            self._restrict_to_papers_with_mixed_gender_referees()
         self._build_dtm(text_representation, ngrams)
         self._merge_with_referee_characteristics()
         if balance_sample_by_gender:
@@ -89,7 +89,7 @@ class RefereeReportDataset:
         self._reports_df.columns = [f"_{column}_" for column in self._reports_df.columns]
         self._papers_df.columns = [f"_{column}_" for column in self._papers_df.columns]
 
-    def _restrict_to_papers_with_mixed_gender_referees(self):  # TODO TODO TODO
+    def _restrict_to_papers_with_mixed_gender_referees(self):
         # Get the portion of each paper's referees who are female.
         refereeship_gender_breakdown = self._df.groupby(level=0)['_female_'].mean()
 
@@ -168,19 +168,18 @@ class RefereeReportDataset:
 
         # Select specified columns from DataFrame.
         dependent_variable = self._df[y]
-        independent_variables = self.df[X]
+        independent_variables = self._df[X]
 
         # Instantiate an OLS regression object.
         self.models[model_name] = OLSRegression(model_name=model_name,
                                                 y_data=dependent_variable,
                                                 X_data=independent_variables,
                                                 add_constant=add_constant,
-                                                logistic=logistic,
                                                 log_transform=log_transform,
                                                 standardize=standardize)
 
         # Run the regression.
-        self.models[model_name].fit()
+        self.models[model_name].fit(logistic=logistic)
 
     def build_ols_results_table(self,
                                 filename: str,
@@ -223,26 +222,18 @@ class RefereeReportDataset:
         latex = stargazer.render_latex()
 
         # Write to file.
-        with open(os.path.join(self.path_to_output, filename + ".tex"), "w") as output_file:
+        with open(os.path.join(self._output_directory, filename + ".tex"), "w") as output_file:
             output_file.write(latex)
 
-    # BELOW: OLD
 
-    def regularized_regress(self,
-                            y,
-                            X,
-                            model_name,
-                            method,
-                            logistic,
-                            log_transform,
-                            standardize,
-                            alphas,
-                            cv_folds,
-                            stratify,
-                            add_constant,
-                            sklearn=False,
-                            l1_ratios=None,
-                            adjust_alpha=False):
+    def regularized_regress(self, model_name: str, y: str, X: List[str], add_constant: bool, logistic: bool, log_transform: bool, standardize: bool,
+                            penalty: str,
+                            stratify: bool,
+                            cv_folds: int,
+                            alphas: np.ndarray,
+                            adjust_alpha: bool,
+                            l1_ratios: np.ndarray = None
+                            ):
         # Check that specified independent, dependent variables are valid.
         self._validate_columns(y, X)
 
@@ -251,39 +242,51 @@ class RefereeReportDataset:
         independent_variables = self._df[X]
 
         # Instantiate a RegularizedRegression object.
-        self.models[model_name] = RegularizedRegression(model_name,
-                                                        dependent_variable,
-                                                        independent_variables,
-                                                        logistic,
-                                                        add_constant,
-                                                        standardize,
-                                                        log_transform,
-                                                        alphas,
-                                                        method,
-                                                        cv_folds,
-                                                        stratify,
-                                                        self._seed,
-                                                        l1_ratios,
-                                                        self.path_to_output,
-                                                        adjust_alpha)
-        if sklearn:
-            self.models[model_name].fit_cross_validated_sklearn()
-        else:
-            self.models[model_name].fit_cross_validated()
+        self.models[model_name] = RegularizedRegression(model_name, dependent_variable, independent_variables, add_constant, log_transform, standardize)
 
-    def resample_variable_binomial(self, variable: str, p: float, ensure_balanced: bool):
-        # Check that the requested column to resample is actually a column in the dataset.
-        self._validate_columns(y=variable, X=[], check_length=False)
+        # Run the regression
+        self.models[model_name].fit(penalty, logistic, stratify, cv_folds, self._seed, alphas, adjust_alpha, l1_ratios)
 
-        np.random.seed(self._seed)
+    def build_regularized_results_table(self, model_name, num_coefs_to_report=40):
+        # Validate model names.
+        if model_name not in self.models:
+            raise ValueError("A model by that name has not been estimated.")
 
-        female_indices = np.random.choice(np.array(np.arange(start=0, stop=len(self._df), step=1)),
-                                          size=int(0.5 * len(self._df)),
-                                          replace=False)
-        non_female_indices = self._df.index.difference(female_indices)
-        self._df.loc[female_indices, variable] = 1
-        self._df.loc[non_female_indices, variable] = 0
+        # Validate model types.
+        if self.models[model_name]._model_type() != "Regularized":
+            raise TypeError("This function may only be used to produce output for regularized regression models.")
 
+        # Get results.
+        coefficients_sorted, regularization_path, final_parameters = self.models[model_name]._results_table
+
+        if len(coefficients_sorted) < num_coefs_to_report * 2:
+            raise ValueError(f"{num_coefs_to_report*2} coefficients were requested, but the requested model only contains {len(coefficients_sorted)} variables.")
+
+        # Format final parameters column.
+        final_parameters = final_parameters.reset_index()['index'] + ": " + final_parameters['Metrics'].round(3).astype(str)
+
+        # Get largest nonzero coefficients; concatenate them with the associated token.
+        top_coefficients = coefficients_sorted.iloc[:num_coefs_to_report]
+        top_coefficients = top_coefficients[top_coefficients != 0]
+        top_coefficients = top_coefficients.reset_index()['index'] + ": " + top_coefficients.round(3).astype(str)
+
+        # Get smallest nonzero coefficients; concatenate them with the associated token.
+        bottom_coefficients = coefficients_sorted.iloc[-num_coefs_to_report:]
+        bottom_coefficients = bottom_coefficients[top_coefficients != 0]
+        bottom_coefficients = bottom_coefficients.reset_index()['index'] + ": " + bottom_coefficients.round(3).astype(str)
+
+        results_table = pd.concat([top_coefficients, bottom_coefficients, final_parameters], axis=1)
+        results_table = results_table.fillna(' ')
+        results_table.columns = ['Words Most Predictive of Female Referee',
+                                 'Words Most Predictive of Non-Female Referee',
+                                 'Other Metrics']
+        results_table.columns = ['\textbf{' + column + '}' for column in results_table.columns]
+        results_table.to_latex(os.path.join(self._output_directory, model_name + "_results.tex"),
+                               index=False,
+                               escape=False,
+                               float_format="%.3f")
+
+    # TODO: RESUME HERE
     def _produce_summary_statistics(self,
                                     adjust_reports_with_papers: bool,
                                     normalize_documents_by_length: bool
@@ -688,78 +691,8 @@ class RefereeReportDataset:
     def get_vocabulary(self):
         return self.report_vocabulary
 
-    def build_regularized_results_table(self, model_name, num_coefs_to_report=30):
-        self._validate_model_request(model_name, expected_model_type="Regularized")
 
-        # Store results table.
-        results_table = self.models[model_name].get_results_table()
 
-        # Validate requested number of top/bottom coefficients.
-        if len(results_table) < num_coefs_to_report * 2:
-            raise ValueError("There are fewer than " + str(num_coefs_to_report * 2) + " coefficients in the results table.")
-
-        # Store metrics in a named column.
-        metrics = pd.Series(results_table.loc[OutputTableConstants.REGULARIZED_REGRESSION_METRICS.value], name="Metrics")
-        if not self.models[model_name]._add_constant:
-            metrics = metrics.drop(labels="Constant")
-        if not self.models[model_name].adjust_alpha:
-            metrics = metrics.drop(labels="$\\alpha^{*}_{adjusted}$")
-            metrics = metrics.drop("$\\bar{p}_{\\alpha^{*}_{adjusted}}$")
-        if self.models[model_name].method != 'elasticnet':
-            metrics = metrics.drop(labels="Optimal L1 Penalty Weight")
-        metrics = metrics.reset_index()
-        metrics = metrics['index'] + ": " + metrics['Metrics'].round(3).astype(str)
-
-        # Store specified dummy variables in a named column.
-        dummy_coefficients = pd.Series(results_table.loc[self.models[model_name]._dummy_variables], name="Dummy Variables").reset_index()
-        dummy_coefficients = dummy_coefficients['index'] + ": " + dummy_coefficients['Dummy Variables'].round(3).astype(str)
-
-        # Drop non-coefficients from the Series of coefficients and sort coefficients by value.
-        non_text_coefs = self.models[model_name]._dummy_variables + OutputTableConstants.REGULARIZED_REGRESSION_METRICS.value
-        coefficients_sorted = results_table.drop(labels=non_text_coefs).sort_values(ascending=False)
-
-        # Get largest nonzero coefficients; concatenate them with the associated token.
-        top_coefficients = pd.Series(coefficients_sorted.iloc[:num_coefs_to_report], name="Largest " + str(num_coefs_to_report) + " Coefficients").reset_index()
-        top_coefficients = top_coefficients[top_coefficients["Largest " + str(num_coefs_to_report) + " Coefficients"] != 0]
-        top_coefficients = top_coefficients['index'] + ": " + top_coefficients["Largest " + str(num_coefs_to_report) + " Coefficients"].round(3).astype(str)
-
-        # Get smallest nonzero coefficients; concatenate them with the associated token.
-        bottom_coefficients = pd.Series(coefficients_sorted.iloc[-num_coefs_to_report:],
-                                        name="Smallest " + str(num_coefs_to_report) + " Coefficients").reset_index()
-        bottom_coefficients = bottom_coefficients[bottom_coefficients["Smallest " + str(num_coefs_to_report) + " Coefficients"] != 0]
-        bottom_coefficients = bottom_coefficients['index'] + ": " + bottom_coefficients["Smallest " + str(num_coefs_to_report) + " Coefficients"].round(
-            3).astype(str)
-        bottom_coefficients = bottom_coefficients.iloc[::-1].reset_index(drop=True)  # Flip order.
-
-        results_table = pd.concat([top_coefficients, bottom_coefficients, dummy_coefficients, metrics], axis=1)
-        results_table = results_table.fillna(' ')
-        results_table.columns = ['Words Most Predictive of Female Referee',
-                                 'Words Most Predictive of Non-Female Referee',
-                                 'Dummy Variables',
-                                 'Other Metrics']
-        if len(dummy_coefficients) == 0:
-            results_table = results_table.drop(columns='Dummy Variables')
-        results_table.columns = ['\textbf{' + column + '}' for column in results_table.columns]
-        results_table.to_latex(os.path.join(self.path_to_output, model_name + "_results.tex"),
-                               index=False,
-                               escape=False,
-                               float_format="%.3f")
-
-    def add_column(self, column):
-        if not isinstance(column, pd.Series):
-            error_msg = "The passed column is not a pandas Series."
-            raise ValueError(error_msg)
-        elif len(column) != len(self._df):
-            error_msg = "The specified column must contain the same number of rows as the existing dataset."
-            raise ValueError(error_msg)
-        elif column.index.tolist() != self._df.index.tolist():
-            error_msg = "The specified column must have an idential pandas Index compared to the existing dataset."
-            raise ValueError(error_msg)
-        elif column.name in set(self._df.columns.tolist()):
-            error_msg = "The specified column's name must not be identical to an existing column in the dataset."
-            raise ValueError(error_msg)
-        else:
-            self._df = pd.concat([self._df, column], axis=1)
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
