@@ -51,7 +51,7 @@ class JournalDocumentReader:
                                     "Check that all document formats are valid.")
 
         # Select optimal format for reports which appear more than once.
-        filename_split = self._df['full_filename'].str.split(pat='.', regex=False)
+        filename_split = self._df['full_filename'].str.split(pat='.')
         self._df['filename_without_extension'] = filename_split.str[0]
         self._df['file_type'] = filename_split.str[1]
         self._df = self._df.groupby(['filename_without_extension']).apply(lambda x: _choose_optimal_format(x))['full_filename']

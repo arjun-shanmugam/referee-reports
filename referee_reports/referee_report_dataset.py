@@ -117,7 +117,7 @@ class RefereeReportDataset:
             raise ValueError("The argument text_representation to referee_report_dataset.build_df() must be either \"R\", \"NR\", \"R-tilde\", \"NR/NP\", ")
 
         # Concatenate DTM with the rest of the test_data.
-        dtm = pd.DataFrame(dtm, self._reports_df.index, columns=vectorizer.get_feature_names_out())
+        dtm = pd.DataFrame(dtm, self._reports_df.index, columns=vectorizer.get_feature_names())
         self._df = pd.concat([self._df, dtm], axis=1)
 
     def _merge_with_referee_characteristics(self):

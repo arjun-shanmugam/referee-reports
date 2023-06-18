@@ -8,18 +8,19 @@ packages = [{include = "referee_reports"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pandas = "^2.0.2"
-nltk = "^3.8.1"
-numpy = ">=1.24.0, <1.25.0"
-statsmodels = "0.12.2"
-scikit-learn = "^1.2.2"
-matplotlib = "^3.7.1"
-pytest = "^7.3.2"
-stargazer = "^0.0.5"
-textract = "^1.6.5"
-python-docx = "^0.8.11"
-setuptools = "59.6.0"
+nltk = "3.5"
+statsmodels = "0.12.1"
+scikit-learn = "0.24.2"
+matplotlib = "3.3.4"
+pytest = "6.2.5"
+stargazer = "0.0.5"
+python-docx = "0.8.11"
 pkldir = {path = "../referee-reports/pkldir-0.1.0-py3-none-any.whl"}
+pandas = "1.1.5"
+p = "^1.4.0"
+numpy = "1.19.5"
+setuptools = "^67.8.0"
+scipy = "1.5.4"
 
 
 
