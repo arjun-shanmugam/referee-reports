@@ -2,7 +2,7 @@
 name = "referee-reports"
 version = "0.1.0"
 description = ""
-authors = ["arjun-shanmugam <65803362+arjun-shanmugam@users.noreply.github.com>"]
+authors = ["arjun-shanmugam <arjun_shanmugam@alumni.brown.edu>"]
 readme = "README.md"
 packages = [{include = "referee_reports"}]
 
