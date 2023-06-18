@@ -848,16 +848,17 @@ version = "0.1.0"
 description = "A simple utility for the base64-encoding and pickling of the contents of a directory"
 optional = false
 python-versions = "*"
-files = []
-develop = false
+files = [
+    {file = "pkldir-0.1.0.tar.gz", hash = "sha256:e3b1aae2e2d84cc8e06a5d2c586b39ee0e53e6f7bd6124913c2508db5b07be64"},
+]
 
 [package.dependencies]
 python-docx = "*"
 textract = "*"
 
 [package.source]
-type = "directory"
-url = "pkldir"
+type = "file"
+url = "pkldir-0.1.0.tar.gz"
 
 [[package]]
 name = "pluggy"
@@ -1417,4 +1418,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "52507b938de49f4bfa561a816c2a797dba56c1b8fade7b5abffe284ccc106825"
+content-hash = "959d071d9b8cf9519420c5af233ee4b24da28a9f16a254aa055d0c4c2b83991f"
