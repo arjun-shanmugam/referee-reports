@@ -9,7 +9,7 @@ import warnings
 from itertools import cycle
 from typing import List
 
-import Stargazer as Stargazer
+from stargazer.stargazer import Stargazer
 import matplotlib.pyplot as plt
 import nltk
 import numpy as np

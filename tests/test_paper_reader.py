@@ -5,7 +5,7 @@ import pytest
 
 @pytest.fixture
 def paper_reader():
-    paper_reader = PaperReader("../../test_data/raw/papers-pkl/", "../../test_data/intermediate/")
+    paper_reader = PaperReader("test_data/raw/papers-pkl/", "test_data/intermediate/")
     paper_reader._validate_raw_data()
     paper_reader._filter_duplicate_documents()
     paper_reader._format_index()

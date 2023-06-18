@@ -6,7 +6,7 @@ import pytest
 
 @pytest.fixture()
 def report_reader_right_before_merge():
-    report_reader = ReportReader("../../test_data/raw/reports-pkl/", "", "../test_data/raw/referee_gender_nonames.csv")
+    report_reader = ReportReader("test_data/raw/reports-pkl/", "", "test_data/raw/referee_gender_nonames.csv")
     report_reader._validate_raw_data()
     report_reader._filter_duplicate_documents()
     report_reader._format_index()
@@ -14,7 +14,7 @@ def report_reader_right_before_merge():
     return report_reader
 @pytest.fixture()
 def report_reader_with_incomplete_referee_characteristics():
-    report_reader = ReportReader("../../test_data/raw/reports-pkl/", "", "../test_data/misc_test_assets/incomplete_referee_gender_nonames.csv")
+    report_reader = ReportReader("test_data/raw/reports-pkl/", "", "test_data/misc_test_assets/incomplete_referee_gender_nonames.csv")
     report_reader._validate_raw_data()
     report_reader._filter_duplicate_documents()
     report_reader._format_index()

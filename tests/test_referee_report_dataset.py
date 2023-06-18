@@ -11,9 +11,9 @@ from referee_reports.referee_report_dataset import RefereeReportDataset
 
 @pytest.fixture
 def referee_report_dataset():
-    return RefereeReportDataset("../test_data/intermediate/reports.txt.pkl",
-                                "../../data/intermediate/papers.txt.pkl",
-                                "../../output/",
+    return RefereeReportDataset("test_data/intermediate/reports.txt.pkl",
+                                "test_data/intermediate/papers.txt.pkl",
+                                "output/",
                                 7)
 
 
