@@ -9,22 +9,13 @@ from typing import List
 from stargazer.stargazer import Stargazer
 import matplotlib.pyplot as plt
 import numpy as np
+from referee_reports.pkldir.decode import decode
+from referee_reports.pkldir.encode import encode
 import pandas as pd
-import pkldir
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from referee_reports.models import OLSRegression, RegularizedRegression
-
-
-# from stargazer.stargazer import Stargazer
-#
-# from constants import OI_constants, OutputTableConstants
-# from figure_utils import (plot_hist, plot_histogram, plot_pie, plot_pie_by,
-#                           plot_scatter)
-# from likelihood_ratio_model import LikelihoodRatioModel
-# from ols_regression import OLSRegression
-# from regularized_regression import RegularizedRegression
 
 
 class RefereeReportDataset:
@@ -49,10 +40,10 @@ class RefereeReportDataset:
             seed (int): _description_
         """
         # noinspection PyTypeChecker
-        self._reports_df = pd.read_csv(io.StringIO(pkldir.decode(cleaned_pickled_reports_file).decode('utf-8')),
+        self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
                                        index_col=['paper', 'refnum'])
         # noinspection PyTypeChecker
-        self._papers_df = pd.read_csv(io.StringIO(pkldir.decode(cleaned_pickled_papers_file).decode('utf-8')),
+        self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
                                       index_col='paper')
         self._output_directory = output_directory
         self._seed = seed

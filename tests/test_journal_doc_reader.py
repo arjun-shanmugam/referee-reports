@@ -2,7 +2,7 @@ from referee_reports.document_readers import JournalDocumentReader, MalformedDoc
 import os
 from io import StringIO
 import pandas as pd
-import pkldir
+from referee_reports.pkldir.decode import decode
 import pytest
 
 
@@ -71,7 +71,7 @@ def test__pickle_df(journal_document_reader):
     journal_document_reader._decode_text()
     journal_document_reader._tokenize_text()
     journal_document_reader._pickle_df()
-    actual = pd.read_csv(StringIO(pkldir.decode("test_data/misc_test_assets/pickled_cleaned_test_data/journal_documents.txt.pkl").decode('utf-8')),
+    actual = pd.read_csv(StringIO(decode("test_data/misc_test_assets/pickled_cleaned_test_data/journal_documents.txt.pkl").decode('utf-8')),
                          index_col='filename_without_extension')
     expected = journal_document_reader._df
     pd.testing.assert_frame_equal(actual, expected)

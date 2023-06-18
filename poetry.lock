@@ -709,24 +709,6 @@ docs = ["furo", "olefile", "sphinx (>=2.4)", "sphinx-copybutton", "sphinx-inline
 tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "packaging", "pyroma", "pytest", "pytest-cov", "pytest-timeout"]
 
 [[package]]
-name = "pkldir"
-version = "0.1.0"
-description = "A simple utility for the base64-encoding and pickling of the contents of a directory"
-optional = false
-python-versions = "*"
-files = [
-    {file = "pkldir-0.1.0-py3-none-any.whl", hash = "sha256:1186a2ea20f2e04ce22efb3cac6482d2cc5cd5cd62791d0a4d5cc5c0f88d6b6f"},
-]
-
-[package.dependencies]
-python-docx = "*"
-textract = "*"
-
-[package.source]
-type = "file"
-url = "pkldir-0.1.0-py3-none-any.whl"
-
-[[package]]
 name = "pluggy"
 version = "1.0.0"
 description = "plugin and hook calling mechanisms for python"
@@ -1304,4 +1286,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "873905b5f757bc46f3265e58237beab3edcceb143cd24ce3e061e00a3a62a990"
+content-hash = "19277dbe91600e4190ce16b20ff510db518a3fbe004af6d7e59865a87e13bfaf"

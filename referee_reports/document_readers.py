@@ -9,7 +9,8 @@ import re
 from typing import List
 import pandas as pd
 import referee_reports.document_readers
-import pkldir
+from referee_reports.pkldir.decode import decode
+from referee_reports.pkldir.encode import encode
 from referee_reports.constants import NLPConstants
 from nltk.tokenize import sent_tokenize, word_tokenize
 
@@ -61,7 +62,7 @@ class JournalDocumentReader:
         # Extract text.
         filepaths = pd.Series(self._raw_pickled_documents_directory, index=self._df.index).str.cat(self._df['full_filename'])
 
-        bytes_ = filepaths.apply(lambda x: pkldir.decode(x))
+        bytes_ = filepaths.apply(lambda x: decode(x))
         self._df['raw_text'] = bytes_.apply(lambda x: x.decode(text_encoding))
 
         # Check if any of the text strings are empty.
@@ -129,7 +130,7 @@ class JournalDocumentReader:
         # Pickle CSV and save it.
         pickled_path = os.path.join(self._cleaned_pickled_output_directory, filename + '.pkl')
         with open(pickled_path, "wb") as file:
-            pickle.dump(pkldir.encode(unpickled_path), file)
+            pickle.dump(encode(unpickled_path), file)
 
         # Delete unpickled CSV file.
         os.remove(unpickled_path)
