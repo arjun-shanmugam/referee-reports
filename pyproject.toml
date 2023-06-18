@@ -17,9 +17,6 @@ scikit-learn = "^1.2.2"
 matplotlib = "^3.7.1"
 pytest = "^7.3.2"
 stargazer = "^0.0.5"
-
-
-[tool.poetry.group.test.dependencies]
 pytest = "^7.3.2"
 
 [build-system]
