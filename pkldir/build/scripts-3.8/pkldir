@@ -1,0 +1,32 @@
+#!python
+
+import os
+import argparse
+
+from pkldir import encode_dir
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description = """
+        This is a simple command-line tool used to pickle the contents of a directory. 
+        The original file and directory are left unchanged. Instead, this tool creates a duplicate 
+        directory with "-pkl" appended to the original name and containing pickled versions 
+        of all the original files. The pickled versions of the original files will have to 
+        ".pkl" appended to the original name.
+        
+        It is also important to note that the files are base64-encoded in addition to being
+        pickled.
+        
+        This package can also be used to decode and ingest the pickled files. This can be done as
+        part of a Python script or an interactive session.""")
+
+    parser.add_argument("dir", help = "This is the directory containing the files to be pickled")
+
+    input_dir = os.path.abspath(parser.parse_args().dir) 
+
+    encode_dir(input_dir)
+
+
+if __name__ == "__main__":
+    main()
