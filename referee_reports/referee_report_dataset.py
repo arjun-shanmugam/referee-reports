@@ -4,21 +4,15 @@
 """
 import io
 import os
-import random
-import warnings
-from itertools import cycle
 from typing import List
 
 from stargazer.stargazer import Stargazer
 import matplotlib.pyplot as plt
-import nltk
 import numpy as np
 import pandas as pd
 import pkldir
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.model_selection import StratifiedKFold
 
 from referee_reports.models import OLSRegression, RegularizedRegression
 

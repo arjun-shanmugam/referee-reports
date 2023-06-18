@@ -8,8 +8,8 @@ import pickle
 import re
 from typing import List
 import pandas as pd
-import pkldir
 import referee_reports.document_readers
+import pkldir
 from referee_reports.constants import NLPConstants
 from nltk.tokenize import sent_tokenize, word_tokenize
 
@@ -60,6 +60,7 @@ class JournalDocumentReader:
     def _decode_text(self, text_encoding='UTF-8'):
         # Extract text.
         filepaths = pd.Series(self._raw_pickled_documents_directory, index=self._df.index).str.cat(self._df['full_filename'])
+
         bytes_ = filepaths.apply(lambda x: pkldir.decode(x))
         self._df['raw_text'] = bytes_.apply(lambda x: x.decode(text_encoding))
 
