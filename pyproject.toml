@@ -9,7 +9,7 @@ packages = [{include = "referee_reports"}]
 [tool.poetry.dependencies]
 python = "^3.8"
 pandas = "^2.0.2"
-pkldir = {path = "/Users/arjunshanmugam/Documents/GitHub/pkldir"}
+pkldir = { path = "pkldir/" }
 nltk = "^3.8.1"
 numpy = ">=1.24.0, <1.25.0"
 statsmodels = "^0.14.0"

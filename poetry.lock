@@ -857,7 +857,7 @@ textract = "*"
 
 [package.source]
 type = "directory"
-url = "../pkldir"
+url = "pkldir"
 
 [[package]]
 name = "pluggy"
@@ -1417,4 +1417,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "0c0955384d6a85adaeb6cdebeb14308431e8dd402edf03ae4bc10f61236d9c11"
+content-hash = "08ebf0edbfa52e5ba6b2cfbd791ceb971b437bf487d66404037806810eeccb60"
