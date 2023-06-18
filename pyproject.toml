@@ -19,7 +19,7 @@ stargazer = "^0.0.5"
 textract = "^1.6.5"
 python-docx = "^0.8.11"
 setuptools = "^67.8.0"
-pkldir = { path = "../referee-reports/pkldir-0.1.0-py3-none-any.whl"}
+pkldir = { path = "./pkldir-0.1.0-py3-none-any.whl"}
 
 
 
