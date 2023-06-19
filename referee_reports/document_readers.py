@@ -277,12 +277,12 @@ class ReportReader(JournalDocumentReader):
 
     def _merge_referee_characteristics(self):
         referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper_num', 'num'])
-        referee_characteristics_df = referee_characteristics_df.rename(columns={'paper_num': 'paper'})
-        
+        referee_characteristics_df.index = referee_characteristics_df.index.rename(['paper', 'num'])
+
         # Remove any trailing/leading whitespace in the recommendation or decision columns.
         referee_characteristics_df.loc[:, 'recommendation'] = referee_characteristics_df['recommendation'].str.strip()
         referee_characteristics_df.loc[:, 'decision'] = referee_characteristics_df['decision'].str.strip()
-        referee_characteristics_df.loc[:, 'authorreferee'] =  referee_characteristics_df['authorreferee'].str.strip()
+        referee_characteristics_df.loc[:, 'authorreferee'] = referee_characteristics_df['authorreferee'].str.strip()
 
         # Reshape dataset so that there is one row for each referee and author genders are stored in columns.
         author_rows_mask = referee_characteristics_df['authorreferee'] == "author"
