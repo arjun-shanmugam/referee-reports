@@ -69,15 +69,17 @@ class JournalDocumentReader:
         # Check if any of the text strings are empty.
         self._df['raw_text'] = self._df['raw_text'].fillna("")
         if (self._df['raw_text'].str.len() <= 100).any():
-            empty_documents_indices = self._df.loc[self._df['raw_text'] == "", :].index.tolist()
+            empty_documents_indices = self._df.loc[self._df['raw_text'] == "", :].index
 
             # Produce correct error message depending on number of levels in index.
             if self._df.index.nlevels > 1:
-                message = ", ".join(["-".join(index) for index in empty_documents_indices])
+                message = ", ".join(["-".join(index) for index in empty_documents_indices.tolist()])
             else:
-                message = ",".join(empty_documents_indices)
-            warnings.warn(f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.",
+                message = ",".join(empty_documents_indices.tolist())
+            warnings.warn(f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc."
+                          "Dropping these documents from the sample.",
                           MalformedDocumentWarning)
+            self._df = self._df.drop(labels=empty_documents_indices)
 
     def _tokenize_text(self):
         def _mwe_retokenize(tokens, token_of_interest):
