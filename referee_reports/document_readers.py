@@ -9,6 +9,7 @@ import re
 from typing import List
 import pandas as pd
 import referee_reports.document_readers
+import warnings
 from referee_reports.pkldir.decode import decode
 from referee_reports.pkldir.encode import encode
 from referee_reports.constants import NLPConstants
@@ -75,8 +76,8 @@ class JournalDocumentReader:
                 message = ", ".join(["-".join(index) for index in empty_documents_indices])
             else:
                 message = ",".join(empty_documents_indices)
-            raise MalformedDocumentError(
-                f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.")
+            warnings.warn(f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.",
+                          MalformedDocumentWarning)
 
     def _tokenize_text(self):
         def _mwe_retokenize(tokens, token_of_interest):
@@ -141,7 +142,7 @@ class JournalDocumentReader:
         os.remove(unpickled_path)
 
 
-class MalformedDocumentError(Exception):
+class MalformedDocumentWarning(Warning):
     """TODO"""
 
 

@@ -1,4 +1,4 @@
-from referee_reports.document_readers import JournalDocumentReader, MalformedDocumentError
+from referee_reports.document_readers import JournalDocumentReader, MalformedDocumentWarning
 import os
 from io import StringIO
 import pandas as pd
@@ -46,7 +46,7 @@ def test__decode_text(journal_document_reader):
     journal_document_reader = JournalDocumentReader("test_data/misc_test_assets/empty_documents-pkl/", "")
     journal_document_reader._validate_raw_data()
     journal_document_reader._filter_duplicate_documents()
-    with pytest.raises(MalformedDocumentError):
+    with pytest.warns(MalformedDocumentWarning):
         journal_document_reader._decode_text()
 
 
