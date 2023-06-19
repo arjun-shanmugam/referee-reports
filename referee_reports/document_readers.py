@@ -76,7 +76,7 @@ class JournalDocumentReader:
                 message = ", ".join(["-".join(str(level) for level in index) for index in empty_documents_indices.tolist()])
             else:
                 message = ",".join(empty_documents_indices.tolist())
-            warnings.warn(f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc."
+            warnings.warn(f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc. "
                           "Dropping these documents from the sample.",
                           MalformedDocumentWarning)
             self._df = self._df.drop(labels=empty_documents_indices)
@@ -276,7 +276,8 @@ class ReportReader(JournalDocumentReader):
         self._df = self._df.set_index(['paper', 'num'])
 
     def _merge_referee_characteristics(self):
-        referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper', 'num'])
+        referee_characteristics_df = pd.read_csv(self._referee_characteristics_file, index_col=['paper_num', 'num'])
+        referee_characteristics_df = referee_characteristics_df.rename(columns={'paper_num': 'num'})
         
         # Remove any trailing/leading whitespace in the recommendation or decision columns.
         referee_characteristics_df.loc[:, 'recommendation'] = referee_characteristics_df['recommendation'].str.strip()
