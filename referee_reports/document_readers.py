@@ -73,7 +73,7 @@ class JournalDocumentReader:
 
             # Produce correct error message depending on number of levels in index.
             if self._df.index.nlevels > 1:
-                message = ", ".join(["-".join(index) for index in empty_documents_indices.tolist()])
+                message = ", ".join(["-".join(str(level) for level in index) for index in empty_documents_indices.tolist()])
             else:
                 message = ",".join(empty_documents_indices.tolist())
             warnings.warn(f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc."
