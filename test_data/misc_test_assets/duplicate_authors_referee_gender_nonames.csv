@@ -1,0 +1,20 @@
+paper_num,num,recommendation,decision,female,authorreferee
+99-99999,1,Reject,Reject,1,referee
+99-99999,2,   Major Revision,Revise,1,referee
+99-99999,3,Accept    ,  Reject,1,referee
+99-99999,4,Reject,Reject,1,referee
+99-99999,1,,Reject,1, author
+99-99999,2,,Revise,0, author
+99-99999,2,,Revise,0, author
+99-99999,2,,Revise,0, author
+99-99999,3,,  Reject,1, author
+99-99999,4,,Reject,0, author
+99-99999,4,,Reject,0, author
+99-99998,1,Reject,Reject,1,referee
+99-99998,2,   Major Revision,Revise,1,referee
+99-99998,3,Accept    ,  Reject,1,referee
+99-99998,4,Reject,Reject,1,referee
+99-99998,1,,Reject,0, author
+99-99998,2,,Revise,0, author
+99-99998,3,,  Reject,1, author
+99-99998,3,,  Reject,1, author

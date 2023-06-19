@@ -247,6 +247,35 @@ class PaperReader(JournalDocumentReader):
         self._df['raw_text'] = pd.Series(restricted_sentences, index=self._df.index).str.join(" ")
 
 
+def _drop_rows_with_duplicate_indices(df: pd.DataFrame, warning_message: str):
+    # Check for duplicates.
+    if (df.index.value_counts() > 1).any():  # If there are any duplicate indices...
+        warnings.warn(warning_message, RuntimeWarning)
+
+        # Drop rows which correspond to duplicate paper-author number combinations.
+
+        # Get name of resulting columns after .reset_index() call.
+        if df.index.nlevels == 1:
+            if df.index.name is None:
+                index_name = 'index'
+                index_name_after_drop = None
+            else:
+                index_name = df.index.name
+                index_name_after_drop = df.index.name
+        else:
+            if df.index.names == [None] * df.index.nlevels:
+                index_name = ['level_' + str(level) for level in range(df.index.nlevels)]
+                index_name_after_drop = df.index.names == [None] * df.index.nlevels
+            else:
+                index_name = df.index.names
+                index_name_after_drop = df.index.names
+
+        to_return = df.reset_index().drop_duplicates(subset=index_name).set_index(index_name)
+        to_return.index = to_return.index.rename(index_name_after_drop)
+        return to_return
+    return df  # If no duplicates, return passed DataFrame as is.
+
+
 class ReportReader(JournalDocumentReader):
     """
     TODO
@@ -288,6 +317,9 @@ class ReportReader(JournalDocumentReader):
         # Reshape dataset so that there is one row for each referee and author genders are stored in columns.
         author_rows_mask = referee_characteristics_df['authorreferee'] == "author"
         author_rows = referee_characteristics_df.loc[author_rows_mask, :].copy()  # Store author rows separately.
+        # Check for duplicate author number-paper combinations and drop if present.
+        warning_message = "Referee characteristics file contains duplicated paper-author number combinations. Keeping first occurrence in case of duplicates."
+        author_rows = _drop_rows_with_duplicate_indices(author_rows, warning_message)
         author_rows = (author_rows.loc[:, ['female']]  # Reshape author genders from long to wide.
                        .reset_index()
                        .pivot(index='paper', columns=['num'])
