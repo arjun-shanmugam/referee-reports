@@ -68,8 +68,13 @@ class JournalDocumentReader:
         # Check if any of the text strings are empty.
         self._df['raw_text'] = self._df['raw_text'].fillna("")
         if (self._df['raw_text'].str.len() <= 100).any():
-            empty_documents = self._df.loc[self._df['raw_text'] == "", :].index.tolist()
-            message = ",".join(empty_documents)
+            empty_documents_indices = self._df.loc[self._df['raw_text'] == "", :].index.tolist()
+
+            # Produce correct error message depending on number of levels in index.
+            if self._df.index.nlevels > 1:
+                message = ", ".join(["-".join(index) for index in empty_documents_indices])
+            else:
+                message = ",".join(empty_documents_indices)
             raise MalformedDocumentError(
                 f"No text or almost no text was extracted for the following documents: {message}. Check raw files for irregular formatting, etc.")
 
@@ -93,7 +98,7 @@ class JournalDocumentReader:
                     retokenized_list.append(current_token)
             return retokenized_list
 
-        def _restrict_tokens(tokens: List[str]):  # TODO
+        def _restrict_tokens(tokens: List[str]):
             restricted_tokens = []
             for token in tokens:
                 if token.isalpha() and len(token) > 2 and token.lower() not in NLPConstants.NLTK_STOPWORDS_ENGLISH:

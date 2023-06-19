@@ -5,7 +5,8 @@ def decode(filename):
     full_file_path = os.path.abspath(filename)
 
     with open(full_file_path, 'rb') as f:
-
+        # Have to use custom load function because the Base64Class is
+        # defined in a different module here than in the actual pkldir package.
         doc = renamed_load(f)
     return doc.decode()
 
