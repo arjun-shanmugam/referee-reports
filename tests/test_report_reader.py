@@ -92,10 +92,11 @@ def test__drop_rows_with_duplicate_indices():
                                             ['row 7a', 'row 7b'],
                                             ['row 8a', 'row 8b'],
                                             ['row 9a', 'row 9b'],
-                                            ['row 10a', 'row 10b']], columns=['column 1', 'column 2'], index=[(1, 'A'), (2, 'B'), (3, 'C'),
-                                                                                                              (4, 'D'), (4, 'D'), (2, 'B'),
-                                                                                                              (2, 'B'), (5, 'E'), (6, 'F'),
-                                                                                                              (7, 'G')])
+                                            ['row 10a', 'row 10b']], columns=['column 1', 'column 2'],
+                                           index=pd.MultiIndex.from_tuples([(1, 'A'), (2, 'B'), (3, 'C'),
+                                                                            (4, 'D'), (4, 'D'), (2, 'B'),
+                                                                            (2, 'B'), (5, 'E'), (6, 'F'),
+                                                                            (7, 'G')]))
     with pytest.warns(RuntimeWarning):
         actual_df = _drop_rows_with_duplicate_indices(df_with_duplicate_index, "")
     expected_df = pd.DataFrame([['row 1a', 'row 1b'],
@@ -104,9 +105,9 @@ def test__drop_rows_with_duplicate_indices():
                                 ['row 4a', 'row 4b'],
                                 ['row 8a', 'row 8b'],
                                 ['row 9a', 'row 9b'],
-                                ['row 10a', 'row 10b']], columns=['column 1', 'column 2'], index=[(1, 'A'), (2, 'B'), (3, 'C'),
-                                                                                                  (4, 'D'), (5, 'E'), (6, 'F'),
-                                                                                                  (7, 'G')])
+                                ['row 10a', 'row 10b']], columns=['column 1', 'column 2'], index=pd.MultiIndex.from_tuples([(1, 'A'), (2, 'B'), (3, 'C'),
+                                                                                                                            (4, 'D'), (5, 'E'), (6, 'F'),
+                                                                                                                            (7, 'G')]))
     pd.testing.assert_frame_equal(actual_df, expected_df)
 
     # Case 4: Multiindex with a name.

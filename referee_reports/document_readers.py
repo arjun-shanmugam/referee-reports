@@ -265,7 +265,7 @@ def _drop_rows_with_duplicate_indices(df: pd.DataFrame, warning_message: str):
         else:
             if df.index.names == [None] * df.index.nlevels:
                 index_name = ['level_' + str(level) for level in range(df.index.nlevels)]
-                index_name_after_drop = df.index.names == [None] * df.index.nlevels
+                index_name_after_drop = [None] * df.index.nlevels
             else:
                 index_name = df.index.names
                 index_name_after_drop = df.index.names
