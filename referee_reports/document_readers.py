@@ -335,7 +335,6 @@ class ReportReader(JournalDocumentReader):
                             validate='1:1', how='inner')
         number_of_reports_merged_with_referee_characteristics = len(self._df)
         if number_of_reports != number_of_reports_merged_with_referee_characteristics:
-            raise FileNotFoundError(f"A total of "
-                                    f"{number_of_reports - number_of_reports_merged_with_referee_characteristics}"
-                                    f"referee reports could not be merged with referee characteristics. Check that"
-                                    f"all referee reports have a corresponding row in referee_gender_nonames.csv")
+            warning_message = f"A total of {number_of_reports - number_of_reports_merged_with_referee_characteristics} " \
+                              f"referee reports could not be merged with referee characteristics. Dropping these reports."
+            warnings.warn(warning_message, ImportWarning)

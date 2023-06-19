@@ -180,7 +180,7 @@ def test__merge_referee_characteristics(report_reader_right_before_merge, report
     expected_df.index = expected_df.index.rename(['paper', 'num'])
     pd.testing.assert_frame_equal(actual_df, expected_df, check_like=True, check_dtype=False)
 
-    # Test that an error is thrown when the referee characteristics dataset is incomplete...
-    # That is, we are missing referee characteristics for any reports, make sure we throw an error.
-    with pytest.raises(FileNotFoundError):
+    # Test that a warning is raised when the referee characteristics dataset is incomplete.
+    # That is, we are missing referee characteristics for any reports.
+    with pytest.warns(ImportWarning):
         report_reader_with_incomplete_referee_characteristics._merge_referee_characteristics()
