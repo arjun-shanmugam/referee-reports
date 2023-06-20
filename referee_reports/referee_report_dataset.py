@@ -289,8 +289,8 @@ class RefereeReportDataset:
         fig, ax = plt.sublots()
         referee_gender_breakdown_counts.pie(ax=ax, colors=Colors.OI_colors)
         ax.set_title("Referee Gender Across Papers")
-
-
+        plt.savefig(os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
+        plt.close(fig)
 
 
 
