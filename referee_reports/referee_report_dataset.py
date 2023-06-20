@@ -9,6 +9,8 @@ from typing import List
 from stargazer.stargazer import Stargazer
 import matplotlib.pyplot as plt
 import numpy as np
+
+import constants
 from referee_reports.pkldir.decode import decode
 from referee_reports.pkldir.encode import encode
 import pandas as pd
@@ -209,7 +211,6 @@ class RefereeReportDataset:
         with open(os.path.join(self._output_directory, filename + ".tex"), "w") as output_file:
             output_file.write(latex)
 
-
     def regularized_regress(self, model_name: str, y: str, X: List[str], add_constant: bool, logistic: bool, log_transform: bool, standardize: bool,
                             penalty: str,
                             stratify: bool,
@@ -244,7 +245,8 @@ class RefereeReportDataset:
         coefficients_sorted, regularization_path, final_parameters = self.models[model_name]._results_table
 
         if len(coefficients_sorted) < num_coefs_to_report * 2:
-            raise ValueError(f"{num_coefs_to_report*2} coefficients were requested, but the requested model only contains {len(coefficients_sorted)} variables.")
+            raise ValueError(
+                f"{num_coefs_to_report * 2} coefficients were requested, but the requested model only contains {len(coefficients_sorted)} variables.")
 
         # Format final parameters column.
         final_parameters = final_parameters.reset_index()['index'] + ": " + final_parameters['Metrics'].round(3).astype(str)
@@ -275,131 +277,92 @@ class RefereeReportDataset:
                                    adjust_reports_with_papers: bool,
                                    normalize_documents_by_length: bool
                                    ):
-        # Pie chart: number of papers with mixed-gender refereeship vs. all female refereeship vs. all male refereeship
-        mean_female_by_paper = (self._df.groupby(by='_paper_', observed=True)
-        .mean()['_female_']  # Get mean of female within each group.
-        )
-        mean_female_by_paper[(mean_female_by_paper != 0) & (mean_female_by_paper != 1)] = "Refereed by Females and Non-Females"
-        mean_female_by_paper = mean_female_by_paper.replace({0: "Refereed by Non-Females Only", 1: "Refereed by Females Only"})
+        # Plot number of referees on each paper of each gender.
+        def tally_referee_genders(referee_genders_for_single_paper: pd.DataFrame):
+            male_referees = (referee_genders_for_single_paper == 0).sum()
+            female_referees = (referee_genders_for_single_paper == 1).sum()
+            return f"{female_referees} female, {male_referees} male"
+        referee_gender_breakdown_counts = (self._df['_female_']
+                                           .groupby(level=0)
+                                           .agg(tally_referee_genders)
+                                           .value_counts())
+        fig, ax = plt.sublots()
+        referee_gender_breakdown_counts.pie(ax=ax, colors=constants.Colors.OI_colors)
+        ax.set_title("Referee Gender Across Papers")
 
-        mean_female_by_paper_grouped = mean_female_by_paper.groupby(mean_female_by_paper).count()  # Get counts of each unique value        
-        plot_pie(x=mean_female_by_paper_grouped,
-                 filepath=os.path.join(self.path_to_output, 'pie_referee_genders_by_paper.png'),
-                 title="Gender Breakdowns of Paper Referees")
 
-        # Pie chart: number of referees on each paper.
-        referees_per_paper = (self._df.groupby(by='_paper_', observed=True)
-                              .count()
-                              .mean(axis=1)  # Every column in this DataFrame is identical, so mean across axes to reduce.
-                              .astype(int)
-                              .replace({1: "One Referee",
-                                        2: "Two Referees",
-                                        3: "Three Referees",
-                                        4: "Four Referees"})
-                              )
-        referees_per_paper_grouped = referees_per_paper.groupby(referees_per_paper).count()  # Get counts of each unique value.
-        plot_pie(x=referees_per_paper_grouped,
-                 filepath=os.path.join(self.path_to_output, 'pie_num_referees_per_paper.png'),
-                 title="Number of Referees Per Paper")
 
-        # Histogram: Skewness of the word count variables.
-        if adjust_reports_with_papers:
-            title = "Skewness of Paper-Adjusted Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_paper_adjusted_" + str(self.ngrams) + "_grams_counts_skewness.png")
-        else:
-            title = "Skewness of Raw Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_raw_" + str(self.ngrams) + "_grams_counts_skewness.png")
-        skewness = self._df[self.report_vocabulary].skew(axis=0)
-        plot_histogram(x=skewness,
-                       filepath=filepath,
-                       title=title,
-                       xlabel="""Skewness of Variable
-                    
-                    This figure calculates 
-                    
-                    """)
 
-        # Histogram: Skewness of log(x+1)-transformed word count variables.
-        if adjust_reports_with_papers:
-            title = "Skewness of ln(x+1)-Transformed Paper-Adjusted Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_paper_adjusted_" + str(self.ngrams) + "_grams_counts_skewness_log_transformed.png")
-        else:
-            title = "Skewness of ln(x+1)-Transformed Raw Wordcount Variables (" + str(self.ngrams) + "-grams)"
-            filepath = os.path.join(self.path_to_output, "hist_raw_" + str(self.ngrams) + "_grams_counts_skewness_log_transformed.png")
-        skewness = np.log(self._df[self.report_vocabulary] + 1).skew(axis=0)
-        plot_histogram(x=skewness,
-                       filepath=filepath,
-                       title=title,
-                       xlabel="Skewness of Variable")
 
-        # Pie chart: Breakdown of decision and recommendation
-        decision_breakdown = self._df['_decision_'].value_counts()
-        plot_pie(x=decision_breakdown,
-                 filepath=os.path.join(self.path_to_output, 'pie_decision.png'),
-                 title="Breakdown of Referee Decisions")
 
-        recommendation_breakdown = self._df['_recommendation_'].value_counts()
-        plot_pie(x=recommendation_breakdown,
-                 filepath=os.path.join(self.path_to_output, 'pie_recomendation.png'),
-                 title="Breakdown of Referee Recommendation")
-
-        # Pie chart: Breakdown of referee decision and recommendation by gender.
-        plot_pie_by(x=self._df['_decision_'],
-                    by=self._df['_female_'],
-                    filepath=os.path.join(self.path_to_output, "pie_decision_by_female.png"),
-                    title="Breakdown of Referee Decision by Referee Gender",
-                    by_value_labels={0: "Non-Female", 1: "Female"})
-
-        plot_pie_by(x=self._df['_recommendation_'],
-                    by=self._df['_female_'],
-                    filepath=os.path.join(self.path_to_output, "pie_recommendation_by_female.png"),
-                    title="Breakdown of Referee Recommendation by Referee Gender",
-                    by_value_labels={0: "Non-Female", 1: "Female"})
-
-        # Pie chart: Breakdown of the number and gender of referees for each paper.
-        referee_counts_each_gender = (self._df.groupby(by=['_paper_', '_female_'], observed=True)
-                                      .count()  # Get number of referees of each gender for each paper.
-                                      .mean(axis=1)  # Counts are identical across columns, so take mean across columns to reduce.
-                                      .unstack()  # Reshape from long to wide.
-                                      .value_counts()  # Get counts of each permutation.
-                                      )
-        # Assign new index so that helper function can generate a labeled pie chart.
-        referee_counts_each_gender = pd.Series(referee_counts_each_gender.values,
-                                               index=['One Non-Female, One Female', 'Two Non-Female, One Female', 'One Non-Female, Two Female'])
-        plot_pie(x=referee_counts_each_gender,
-                 filepath=os.path.join(self.path_to_output, "pie_referee_gender_number_permutations.png"),
-                 title="Breakdown of Paper Referees and their Genders")
-
-        if not normalize_documents_by_length:
-            # Histogram: Number of tokens in reports.
-            tokens_per_report = self.tf_reports[self.report_vocabulary].sum(axis=1)
-            xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
-        
-            Note: This figure is a histogram of the number of tokens in the sample reports after all cleaning, 
-            sample restriction, vectorization, and removal of low-frequency tokens. Equivalently, this figure
-            gives the distribution of report lengths in tokens immediately before analysis.
-                    '''
-            plot_histogram(x=tokens_per_report,
-                           filepath=os.path.join(self.path_to_output,
-                                                 "hist_tokens_per_report_immediately_before_analysis.png"),
-                           title="Number of Tokens in Each Report (" + str(self.ngrams) + "-Grams)",
-                           xlabel=xlabel)
-
-            # Histogram: Number of tokens in papers.
-            tokens_per_paper = self.tf_papers[self.report_vocabulary].sum(axis=1)
-            xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
-
-            Note: This figure is a histogram of the number of tokens in the sample papers after cleaning, 
-            sample restriction, restriction to introductions, removal of thank yous, vectorization, and
-            removal of low-frequency tokens. Equivalently, this figure gives the distribution of paper
-            lengths in tokens immediately before analysis. Note that this figure only counts tokens 
-            which also appear somewhere in the corpus of reports.
-            '''
-            plot_histogram(x=tokens_per_paper,
-                           filepath=os.path.join(self.path_to_output,
-                                                 "hist_tokens_per_paper_immediately_before_analysis.png"),
-                           title="Number of Tokens in Each Paper (" + str(self.ngrams) + "-Grams)",
-                           xlabel=xlabel)
+        # # Pie chart: Breakdown of decision and recommendation
+        # decision_breakdown = self._df['_decision_'].value_counts()
+        # plot_pie(x=decision_breakdown,
+        #          filepath=os.path.join(self.path_to_output, 'pie_decision.png'),
+        #          title="Breakdown of Referee Decisions")
+        #
+        # recommendation_breakdown = self._df['_recommendation_'].value_counts()
+        # plot_pie(x=recommendation_breakdown,
+        #          filepath=os.path.join(self.path_to_output, 'pie_recomendation.png'),
+        #          title="Breakdown of Referee Recommendation")
+        #
+        # # Pie chart: Breakdown of referee decision and recommendation by gender.
+        # plot_pie_by(x=self._df['_decision_'],
+        #             by=self._df['_female_'],
+        #             filepath=os.path.join(self.path_to_output, "pie_decision_by_female.png"),
+        #             title="Breakdown of Referee Decision by Referee Gender",
+        #             by_value_labels={0: "Non-Female", 1: "Female"})
+        #
+        # plot_pie_by(x=self._df['_recommendation_'],
+        #             by=self._df['_female_'],
+        #             filepath=os.path.join(self.path_to_output, "pie_recommendation_by_female.png"),
+        #             title="Breakdown of Referee Recommendation by Referee Gender",
+        #             by_value_labels={0: "Non-Female", 1: "Female"})
+        #
+        # # Pie chart: Breakdown of the number and gender of referees for each paper.
+        # referee_counts_each_gender = (self._df.groupby(by=['_paper_', '_female_'], observed=True)
+        #                               .count()  # Get number of referees of each gender for each paper.
+        #                               .mean(axis=1)  # Counts are identical across columns, so take mean across columns to reduce.
+        #                               .unstack()  # Reshape from long to wide.
+        #                               .value_counts()  # Get counts of each permutation.
+        #                               )
+        # # Assign new index so that helper function can generate a labeled pie chart.
+        # referee_counts_each_gender = pd.Series(referee_counts_each_gender.values,
+        #                                        index=['One Non-Female, One Female', 'Two Non-Female, One Female', 'One Non-Female, Two Female'])
+        # plot_pie(x=referee_counts_each_gender,
+        #          filepath=os.path.join(self.path_to_output, "pie_referee_gender_number_permutations.png"),
+        #          title="Breakdown of Paper Referees and their Genders")
+        #
+        # if not normalize_documents_by_length:
+        #     # Histogram: Number of tokens in reports.
+        #     tokens_per_report = self.tf_reports[self.report_vocabulary].sum(axis=1)
+        #     xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
+        #
+        #     Note: This figure is a histogram of the number of tokens in the sample reports after all cleaning,
+        #     sample restriction, vectorization, and removal of low-frequency tokens. Equivalently, this figure
+        #     gives the distribution of report lengths in tokens immediately before analysis.
+        #             '''
+        #     plot_histogram(x=tokens_per_report,
+        #                    filepath=os.path.join(self.path_to_output,
+        #                                          "hist_tokens_per_report_immediately_before_analysis.png"),
+        #                    title="Number of Tokens in Each Report (" + str(self.ngrams) + "-Grams)",
+        #                    xlabel=xlabel)
+        #
+        #     # Histogram: Number of tokens in papers.
+        #     tokens_per_paper = self.tf_papers[self.report_vocabulary].sum(axis=1)
+        #     xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
+        #
+        #     Note: This figure is a histogram of the number of tokens in the sample papers after cleaning,
+        #     sample restriction, restriction to introductions, removal of thank yous, vectorization, and
+        #     removal of low-frequency tokens. Equivalently, this figure gives the distribution of paper
+        #     lengths in tokens immediately before analysis. Note that this figure only counts tokens
+        #     which also appear somewhere in the corpus of reports.
+        #     '''
+        #     plot_histogram(x=tokens_per_paper,
+        #                    filepath=os.path.join(self.path_to_output,
+        #                                          "hist_tokens_per_paper_immediately_before_analysis.png"),
+        #                    title="Number of Tokens in Each Paper (" + str(self.ngrams) + "-Grams)",
+        #                    xlabel=xlabel)
 
         # """
 
@@ -674,9 +637,6 @@ class RefereeReportDataset:
 
     def get_vocabulary(self):
         return self.report_vocabulary
-
-
-
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],

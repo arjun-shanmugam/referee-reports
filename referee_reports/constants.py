@@ -16,3 +16,22 @@ class NLPConstants:
                               'most', 'couldn', 'off', 'd', 'won', "needn't", "wasn't", 'into', "should've", "aren't",
                               'if', 'ain', 'or', "that'll", 'it', 'hadn', 'below', 'ma', 'both', 'is', 'am', 'each',
                               "she's", 'ours', 'during', 'haven', 'mightn', 'no', 'and', 'above', 'she', 'which'}
+
+class Colors:
+    P1 = "#29B6A4"
+    P2 = "#FAA523"
+    P3 = "#003A4F"
+    P4 = "#7F4892"
+    P5 = "#A4CE4E"
+    P6 = "#2B8F43"
+    P7 = "#0073A2"
+    P8 = "#E54060"
+    P9 = "#FFD400"
+    P10 = "#6BBD45"
+
+    OI_colors = [P1, P2, P3, P4, P5, P6, P7, P8, P9, P10]
+
+    SUMMARY_STATISTICS_COLOR = 'black'
+    LABELING_COLOR = 'grey'
+    TREATMENT_COLOR = 'red'
+    CONTROL_COLOR = 'blue'
