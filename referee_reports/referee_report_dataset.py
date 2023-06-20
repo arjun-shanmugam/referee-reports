@@ -10,7 +10,7 @@ from stargazer.stargazer import Stargazer
 import matplotlib.pyplot as plt
 import numpy as np
 
-import constants
+from referee_reports.constants import Colors
 from referee_reports.pkldir.decode import decode
 from referee_reports.pkldir.encode import encode
 import pandas as pd
@@ -287,7 +287,7 @@ class RefereeReportDataset:
                                            .agg(tally_referee_genders)
                                            .value_counts())
         fig, ax = plt.sublots()
-        referee_gender_breakdown_counts.pie(ax=ax, colors=constants.Colors.OI_colors)
+        referee_gender_breakdown_counts.pie(ax=ax, colors=Colors.OI_colors)
         ax.set_title("Referee Gender Across Papers")
 
 
@@ -493,147 +493,147 @@ class RefereeReportDataset:
         # """
 
         # Histogram: Number of reports in which tokens appear.
-        num_reports_where_word_appears = (self.tf_reports
-                                          .mask(self.tf_reports > 0, 1)
-                                          .sum(axis=0)
-                                          .transpose()
-                                          )
-
-        xlabel = """Number of Reports
-
-        This figure plots the distribution over the number of reports in which each token appears.
-        It is produced after all cleaning but before the removal of low-frequency tokens. To produce this figure,
-        I calculate the number of reports in which each token appears at least once. I sort tokens into bins
-        based on those values to produce this figure. """
-        plot_histogram(x=num_reports_where_word_appears,
-                       title="Number of Reports in Which Tokens Appear (" + str(self.ngrams) + "-grams)",
-                       xlabel=xlabel,
-                       filepath=os.path.join(self.path_to_output, 'hist_num_reports_where_tokens_appear_' + str(self.ngrams) + '_grams.png'))
-
-        # Hist: Average length of male vs. female reports immediately before analysis.
-        report_lengths = (
-            self.tf_reports
-            .sum(axis=1)
-        )
-        male_report_lengths = report_lengths.loc[self._df['_female_'] == 0]
-        male_report_lengths_mean = male_report_lengths.mean().round(3)
-        male_report_lengths_se = male_report_lengths.sem().round(3)
-        female_report_lengths = report_lengths.loc[self._df['_female_'] == 1]
-        female_report_lengths_mean = female_report_lengths.mean().round(3)
-        female_report_lengths_se = female_report_lengths.sem().round(3)
-
-        fig, ax = plt.subplots(1, 1)
-        plot_hist(ax=ax,
-                  x=male_report_lengths,
-                  title="Distribution of Male-Written vs. Female-Written Report Lengths",
-                  xlabel='Report Length',
-                  ylabel='Normalized Frequency',
-                  alpha=0.5,
-                  color=OI_constants.male_color.value,
-                  summary_statistics_linecolors=OI_constants.male_color.value,
-                  label="Male Reports \n Mean length: " + str(male_report_lengths_mean) + " (SE: " + str(male_report_lengths_se) + ")",
-                  summary_statistics=['median'])
-        plot_hist(ax=ax,
-                  x=female_report_lengths,
-                  title="Distribution of Male-Written vs. Female-Written Report Lengths",
-                  xlabel='Report Length',
-                  ylabel='Normalized Frequency',
-                  alpha=0.5,
-                  color=OI_constants.female_color.value,
-                  summary_statistics_linecolors=OI_constants.female_color.value,
-                  label="Female Reports \n Mean length: " + str(female_report_lengths_mean) + " (SE: " + str(female_report_lengths_se) + ")",
-                  summary_statistics=['median'])
-        ax.legend(loc='best', fontsize='x-small')
-        plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_report_lengths_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
-        plt.close(fig)
-
-        # Table: Most common words for men and women (R).
-        occurrences_by_gender = (
-            pd.concat([self.tf_reports, self._df['_female_']], axis=1)
-            .groupby(by='_female_')
-            .sum()
-            .transpose()
-        )
-
-        male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
-                                     name="Most Common Words in Male-Written Reports").reset_index().iloc[:50]
-        male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
-            "\textbf{Most Common Words in Male-Written Reports}")
-        female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
-                                       name="Most Common Words in Female-Written Reports").reset_index().iloc[:50]
-        female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
-            "\textbf{Most Common Words in Female-Written Reports}")
-        pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
-            os.path.join(self.path_to_output, "table_most_common_words_by_gender_R_" + str(self.ngrams) + "_grams.tex"),
-            index=False,
-            escape=False,
-            float_format="%.3f")
-
-        # Table: Most common words for men and women (NR).
-        report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
-        occurrences_by_gender = (
-            pd.concat([self.tf_reports.div(report_lengths, axis=0), self._df['_female_']], axis=1)
-            .groupby(by='_female_')
-            .sum()
-            .transpose()
-        )
-        male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
-                                     name="Most Common Words in Male-Written Reports").reset_index().iloc[:50].round(3)
-        male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
-            "\textbf{Most Common Words in Male-Written Reports}")
-        female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
-                                       name="Most Common Words in Female-Written Reports").reset_index().iloc[:50].round(3)
-        female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
-            "\textbf{Most Common Words in Female-Written Reports}")
-        pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
-            os.path.join(self.path_to_output, "table_most_common_words_by_gender_NR_" + str(self.ngrams) + "_grams.tex"),
-            index=False,
-            escape=False,
-            float_format="%.3f")
-
-        # Hist: Cosine similarity between NR vectors and NP vectors, separately for males and females.
-        report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.      
-        NR = self.tf_reports.div(report_lengths, axis=0)
-        paper_lengths = self.tf_papers.sum(axis=1)  # Calculate NP_j
-        NP = self.tf_papers.div(paper_lengths, axis=0)
-        index = pd.MultiIndex.from_frame(self._df[['_paper_', '_num_']], names=['_paper_', '_num_'])
-        columns = self._df['_paper_']
-        cosine_similarities = pd.DataFrame(cosine_similarity(NR, NP), index=index, columns=columns)
-        cosine_similarities = pd.Series(np.diag(cosine_similarities), index=cosine_similarities.index, name='similarity')
-        genders = self._df[['_female_', '_paper_', '_num_']].set_index(['_paper_', '_num_'])
-        cosine_similarities_and_genders = pd.concat([cosine_similarities, genders], axis=1)
-        cosine_similarities_males = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 0, 'similarity']
-        cosine_similarities_females = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 1, 'similarity']
-        fig, ax = plt.subplots(1, 1)
-
-        male_mean = cosine_similarities_males.mean().round(3)
-        male_se = cosine_similarities_males.sem().round(3)
-        plot_hist(ax=ax,
-                  x=cosine_similarities_males,
-                  title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
-                  xlabel='Cosine Similarity',
-                  ylabel='Normalized Frequency',
-                  alpha=0.5,
-                  color=OI_constants.male_color.value,
-                  summary_statistics_linecolors=OI_constants.male_color.value,
-                  label="Male Reports \n Mean Cosine Similarity: " + str(male_mean) + " (SE: " + str(male_se) + ")",
-                  summary_statistics=['median'])
-
-        female_mean = cosine_similarities_females.mean().round(3)
-        female_se = cosine_similarities_females.sem().round(3)
-        plot_hist(ax=ax,
-                  x=cosine_similarities_females,
-                  title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
-                  xlabel='Cosine Similarity',
-                  ylabel='Normalized Frequency',
-                  alpha=0.5,
-                  color=OI_constants.female_color.value,
-                  summary_statistics_linecolors=OI_constants.female_color.value,
-                  label="Female Reports \n Mean Cosine Similarity: " + str(female_mean) + " (SE: " + str(female_se) + ")",
-                  summary_statistics=['median'])
-        ax.legend(loc='best', fontsize='x-small')
-        plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_cosine_similarity_NR_NP_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
-        plt.close(fig)
+        # num_reports_where_word_appears = (self.tf_reports
+        #                                   .mask(self.tf_reports > 0, 1)
+        #                                   .sum(axis=0)
+        #                                   .transpose()
+        #                                   )
+        #
+        # xlabel = """Number of Reports
+        #
+        # This figure plots the distribution over the number of reports in which each token appears.
+        # It is produced after all cleaning but before the removal of low-frequency tokens. To produce this figure,
+        # I calculate the number of reports in which each token appears at least once. I sort tokens into bins
+        # based on those values to produce this figure. """
+        # plot_histogram(x=num_reports_where_word_appears,
+        #                title="Number of Reports in Which Tokens Appear (" + str(self.ngrams) + "-grams)",
+        #                xlabel=xlabel,
+        #                filepath=os.path.join(self.path_to_output, 'hist_num_reports_where_tokens_appear_' + str(self.ngrams) + '_grams.png'))
+        #
+        # # Hist: Average length of male vs. female reports immediately before analysis.
+        # report_lengths = (
+        #     self.tf_reports
+        #     .sum(axis=1)
+        # )
+        # male_report_lengths = report_lengths.loc[self._df['_female_'] == 0]
+        # male_report_lengths_mean = male_report_lengths.mean().round(3)
+        # male_report_lengths_se = male_report_lengths.sem().round(3)
+        # female_report_lengths = report_lengths.loc[self._df['_female_'] == 1]
+        # female_report_lengths_mean = female_report_lengths.mean().round(3)
+        # female_report_lengths_se = female_report_lengths.sem().round(3)
+        #
+        # fig, ax = plt.subplots(1, 1)
+        # plot_hist(ax=ax,
+        #           x=male_report_lengths,
+        #           title="Distribution of Male-Written vs. Female-Written Report Lengths",
+        #           xlabel='Report Length',
+        #           ylabel='Normalized Frequency',
+        #           alpha=0.5,
+        #           color=OI_constants.male_color.value,
+        #           summary_statistics_linecolors=OI_constants.male_color.value,
+        #           label="Male Reports \n Mean length: " + str(male_report_lengths_mean) + " (SE: " + str(male_report_lengths_se) + ")",
+        #           summary_statistics=['median'])
+        # plot_hist(ax=ax,
+        #           x=female_report_lengths,
+        #           title="Distribution of Male-Written vs. Female-Written Report Lengths",
+        #           xlabel='Report Length',
+        #           ylabel='Normalized Frequency',
+        #           alpha=0.5,
+        #           color=OI_constants.female_color.value,
+        #           summary_statistics_linecolors=OI_constants.female_color.value,
+        #           label="Female Reports \n Mean length: " + str(female_report_lengths_mean) + " (SE: " + str(female_report_lengths_se) + ")",
+        #           summary_statistics=['median'])
+        # ax.legend(loc='best', fontsize='x-small')
+        # plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_report_lengths_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
+        # plt.close(fig)
+        #
+        # # Table: Most common words for men and women (R).
+        # occurrences_by_gender = (
+        #     pd.concat([self.tf_reports, self._df['_female_']], axis=1)
+        #     .groupby(by='_female_')
+        #     .sum()
+        #     .transpose()
+        # )
+        #
+        # male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
+        #                              name="Most Common Words in Male-Written Reports").reset_index().iloc[:50]
+        # male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
+        #     "\textbf{Most Common Words in Male-Written Reports}")
+        # female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
+        #                                name="Most Common Words in Female-Written Reports").reset_index().iloc[:50]
+        # female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
+        #     "\textbf{Most Common Words in Female-Written Reports}")
+        # pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
+        #     os.path.join(self.path_to_output, "table_most_common_words_by_gender_R_" + str(self.ngrams) + "_grams.tex"),
+        #     index=False,
+        #     escape=False,
+        #     float_format="%.3f")
+        #
+        # # Table: Most common words for men and women (NR).
+        # report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.
+        # occurrences_by_gender = (
+        #     pd.concat([self.tf_reports.div(report_lengths, axis=0), self._df['_female_']], axis=1)
+        #     .groupby(by='_female_')
+        #     .sum()
+        #     .transpose()
+        # )
+        # male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
+        #                              name="Most Common Words in Male-Written Reports").reset_index().iloc[:50].round(3)
+        # male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
+        #     "\textbf{Most Common Words in Male-Written Reports}")
+        # female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
+        #                                name="Most Common Words in Female-Written Reports").reset_index().iloc[:50].round(3)
+        # female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
+        #     "\textbf{Most Common Words in Female-Written Reports}")
+        # pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
+        #     os.path.join(self.path_to_output, "table_most_common_words_by_gender_NR_" + str(self.ngrams) + "_grams.tex"),
+        #     index=False,
+        #     escape=False,
+        #     float_format="%.3f")
+        #
+        # # Hist: Cosine similarity between NR vectors and NP vectors, separately for males and females.
+        # report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.
+        # NR = self.tf_reports.div(report_lengths, axis=0)
+        # paper_lengths = self.tf_papers.sum(axis=1)  # Calculate NP_j
+        # NP = self.tf_papers.div(paper_lengths, axis=0)
+        # index = pd.MultiIndex.from_frame(self._df[['_paper_', '_num_']], names=['_paper_', '_num_'])
+        # columns = self._df['_paper_']
+        # cosine_similarities = pd.DataFrame(cosine_similarity(NR, NP), index=index, columns=columns)
+        # cosine_similarities = pd.Series(np.diag(cosine_similarities), index=cosine_similarities.index, name='similarity')
+        # genders = self._df[['_female_', '_paper_', '_num_']].set_index(['_paper_', '_num_'])
+        # cosine_similarities_and_genders = pd.concat([cosine_similarities, genders], axis=1)
+        # cosine_similarities_males = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 0, 'similarity']
+        # cosine_similarities_females = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 1, 'similarity']
+        # fig, ax = plt.subplots(1, 1)
+        #
+        # male_mean = cosine_similarities_males.mean().round(3)
+        # male_se = cosine_similarities_males.sem().round(3)
+        # plot_hist(ax=ax,
+        #           x=cosine_similarities_males,
+        #           title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
+        #           xlabel='Cosine Similarity',
+        #           ylabel='Normalized Frequency',
+        #           alpha=0.5,
+        #           color=OI_constants.male_color.value,
+        #           summary_statistics_linecolors=OI_constants.male_color.value,
+        #           label="Male Reports \n Mean Cosine Similarity: " + str(male_mean) + " (SE: " + str(male_se) + ")",
+        #           summary_statistics=['median'])
+        #
+        # female_mean = cosine_similarities_females.mean().round(3)
+        # female_se = cosine_similarities_females.sem().round(3)
+        # plot_hist(ax=ax,
+        #           x=cosine_similarities_females,
+        #           title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
+        #           xlabel='Cosine Similarity',
+        #           ylabel='Normalized Frequency',
+        #           alpha=0.5,
+        #           color=OI_constants.female_color.value,
+        #           summary_statistics_linecolors=OI_constants.female_color.value,
+        #           label="Female Reports \n Mean Cosine Similarity: " + str(female_mean) + " (SE: " + str(female_se) + ")",
+        #           summary_statistics=['median'])
+        # ax.legend(loc='best', fontsize='x-small')
+        # plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_cosine_similarity_NR_NP_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
+        # plt.close(fig)
 
     def get_vocabulary(self):
         return self.report_vocabulary
