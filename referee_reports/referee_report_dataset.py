@@ -41,7 +41,7 @@ class RefereeReportDataset:
         """
         # noinspection PyTypeChecker
         self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
-                                       index_col=['paper', 'refnum'])
+                                       index_col=['paper', 'num'])
         # noinspection PyTypeChecker
         self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
                                       index_col='paper')
@@ -62,7 +62,6 @@ class RefereeReportDataset:
     def build_df(self, text_representation: str, ngrams: int, restrict_to_papers_with_mixed_gender_referees: bool, balance_sample_by_gender: bool):
 
         self._format_non_vocabulary_columns()
-        # TODO: Restrict sample to mix-gendered referee groups if desired.
         if restrict_to_papers_with_mixed_gender_referees:
             self._restrict_to_papers_with_mixed_gender_referees()
         self._build_dtm(text_representation, ngrams)
@@ -272,10 +271,10 @@ class RefereeReportDataset:
                                float_format="%.3f")
 
     # TODO: RESUME HERE
-    def _produce_summary_statistics(self,
-                                    adjust_reports_with_papers: bool,
-                                    normalize_documents_by_length: bool
-                                    ):
+    def produce_summary_statistics(self,
+                                   adjust_reports_with_papers: bool,
+                                   normalize_documents_by_length: bool
+                                   ):
         # Pie chart: number of papers with mixed-gender refereeship vs. all female refereeship vs. all male refereeship
         mean_female_by_paper = (self._df.groupby(by='_paper_', observed=True)
         .mean()['_female_']  # Get mean of female within each group.
@@ -634,11 +633,11 @@ class RefereeReportDataset:
         NR = self.tf_reports.div(report_lengths, axis=0)
         paper_lengths = self.tf_papers.sum(axis=1)  # Calculate NP_j
         NP = self.tf_papers.div(paper_lengths, axis=0)
-        index = pd.MultiIndex.from_frame(self._df[['_paper_', '_refnum_']], names=['_paper_', '_refnum_'])
+        index = pd.MultiIndex.from_frame(self._df[['_paper_', '_num_']], names=['_paper_', '_num_'])
         columns = self._df['_paper_']
         cosine_similarities = pd.DataFrame(cosine_similarity(NR, NP), index=index, columns=columns)
         cosine_similarities = pd.Series(np.diag(cosine_similarities), index=cosine_similarities.index, name='similarity')
-        genders = self._df[['_female_', '_paper_', '_refnum_']].set_index(['_paper_', '_refnum_'])
+        genders = self._df[['_female_', '_paper_', '_num_']].set_index(['_paper_', '_num_'])
         cosine_similarities_and_genders = pd.concat([cosine_similarities, genders], axis=1)
         cosine_similarities_males = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 0, 'similarity']
         cosine_similarities_females = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 1, 'similarity']
