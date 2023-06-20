@@ -62,10 +62,10 @@ class RefereeReportDataset:
     def build_df(self, text_representation: str, ngrams: int, restrict_to_papers_with_mixed_gender_referees: bool, balance_sample_by_gender: bool):
 
         self._format_non_vocabulary_columns()
-        if restrict_to_papers_with_mixed_gender_referees:
-            self._restrict_to_papers_with_mixed_gender_referees()
         self._build_dtm(text_representation, ngrams)
         self._merge_with_referee_characteristics()
+        if restrict_to_papers_with_mixed_gender_referees:
+            self._restrict_to_papers_with_mixed_gender_referees()
         if balance_sample_by_gender:
             self._balance_sample_by_gender()
 
