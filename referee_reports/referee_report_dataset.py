@@ -10,7 +10,6 @@ from stargazer.stargazer import Stargazer
 import matplotlib.pyplot as plt
 import numpy as np
 
-import constants
 from referee_reports.constants import Colors
 from referee_reports.pkldir.decode import decode
 import pandas as pd
@@ -319,8 +318,8 @@ class RefereeReportDataset:
 
         # Plot distribution of report lengths, separately by gender.
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-        for gender, title, ax, color in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2], constants.Colors.P1,
-                                            constants.Colors.P2):
+        for gender, title, ax, color in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2], Colors.P1,
+                                            Colors.P2):
             report_lengths = self._df.loc[self._df['_female_'] == gender, self._reports_vocabulary].sum(axis=1)
             plot_histogram(ax, x=report_lengths, title=title, xlabel="Length")
         save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths_by_gender.png"))
@@ -367,21 +366,7 @@ class RefereeReportDataset:
                                                                                              escape=False,
                                                                                              )
 
-        # male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
-        #                              name="Most Common Words in Male-Written Reports").reset_index().iloc[:50].round(3)
-        # male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
-        #     "\textbf{Most Common Words in Male-Written Reports}")
-        # female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
-        #                                name="Most Common Words in Female-Written Reports").reset_index().iloc[:50].round(3)
-        # female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
-        #     "\textbf{Most Common Words in Female-Written Reports}")
-        # pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
-        #     os.path.join(self.path_to_output, "table_most_common_words_by_gender_NR_" + str(self.ngrams) + "_grams.tex"),
-        #     index=False,
-        #     escape=False,
-        #     float_format="%.3f")
-        #
-
+    # TODO: RESUME HERE
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
                                                        document_classification_variable=self._df['_female_'],
