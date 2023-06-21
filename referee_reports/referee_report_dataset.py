@@ -321,7 +321,7 @@ class RefereeReportDataset:
         for gender, title, ax, color in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2], [Colors.P1,
                                             Colors.P2]):
             report_lengths = self._df.loc[self._df['_female_'] == gender, self._reports_vocabulary].sum(axis=1)
-            plot_histogram(ax, x=report_lengths, title=title, xlabel="Length")
+            plot_histogram(ax, x=report_lengths, title=title, xlabel="Length", color=color)
         save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths_by_gender.png"))
 
         # Plot distribution of number of reports in which words appear.
