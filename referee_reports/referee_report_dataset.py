@@ -285,52 +285,29 @@ class RefereeReportDataset:
                                            .value_counts())
         fig, ax = plt.subplots()
         referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors)
-        ax.set_title("Referee Gender Across Papers")
         plt.savefig(os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
         plt.close(fig)
 
-        # Plot distribution of decision.
-        referee_decisions = self._df['_decision_'].value_counts()
-        fig, ax = plt.subplots()
-        referee_decisions.plot.pie(ax=ax, colors=Colors.OI_colors)
-        plt.savefig(os.path.join(self._output_directory, "referee_decisions.png"), bbox_inches='tight')
-        plt.close(fig)
+        # Plot distribution of decision and recommendation.
+        for variable, filename in zip('_decision_', '_recommendation_', ["referee_decisions.png", "referee_recommendations.png"]):
+            distribution = self._df[variable].value_counts()
+            fig, ax = plt.subplots()
+            distribution.plot.pie(ax=ax, colors=Colors.OI_colors)
+            plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
+            plt.close(fig)
 
-        # Plot distribution of recommendation.
-        referee_recommendations = self._df['_recommendation_'].value_counts()
-        fig, ax = plt.subplots()
-        referee_recommendations.plot.pie(ax=ax, colors=Colors.OI_colors)
-        plt.savefig(os.path.join(self._output_directory, "referee_recommendations.png"), bbox_inches='tight')
-        plt.close(fig)
+        # Plot distribution of decision and recommendation, separately by gender.
+        for variable, filename in zip('_decision_', '_recommendation_', ["referee_decisions_by_gender.png", "referee_recommendations_by_gender.png"]):
+            distribution_female = self._df[self._df['_female_'] == 1, variable].value_counts()
+            distribution_male = self._df[self._df['_female_'] == 0, variable].value_counts()
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            distribution_female.plot.pie(ax=ax1, colors=Colors.OI_colors)
+            ax1.set_title("Female Referees")
+            distribution_male.plot.pie(ax=ax2, colors=Colors.OI_colors)
+            ax2.set_title("Non-female Referees")
+            plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
+            plt.close(fig)
 
-
-        # # Pie chart: Breakdown of referee decision and recommendation by gender.
-        # plot_pie_by(x=self._df['_decision_'],
-        #             by=self._df['_female_'],
-        #             filepath=os.path.join(self.path_to_output, "pie_decision_by_female.png"),
-        #             title="Breakdown of Referee Decision by Referee Gender",
-        #             by_value_labels={0: "Non-Female", 1: "Female"})
-        #
-        # plot_pie_by(x=self._df['_recommendation_'],
-        #             by=self._df['_female_'],
-        #             filepath=os.path.join(self.path_to_output, "pie_recommendation_by_female.png"),
-        #             title="Breakdown of Referee Recommendation by Referee Gender",
-        #             by_value_labels={0: "Non-Female", 1: "Female"})
-        #
-        # # Pie chart: Breakdown of the number and gender of referees for each paper.
-        # referee_counts_each_gender = (self._df.groupby(by=['_paper_', '_female_'], observed=True)
-        #                               .count()  # Get number of referees of each gender for each paper.
-        #                               .mean(axis=1)  # Counts are identical across columns, so take mean across columns to reduce.
-        #                               .unstack()  # Reshape from long to wide.
-        #                               .value_counts()  # Get counts of each permutation.
-        #                               )
-        # # Assign new index so that helper function can generate a labeled pie chart.
-        # referee_counts_each_gender = pd.Series(referee_counts_each_gender.values,
-        #                                        index=['One Non-Female, One Female', 'Two Non-Female, One Female', 'One Non-Female, Two Female'])
-        # plot_pie(x=referee_counts_each_gender,
-        #          filepath=os.path.join(self.path_to_output, "pie_referee_gender_number_permutations.png"),
-        #          title="Breakdown of Paper Referees and their Genders")
-        #
         # if not normalize_documents_by_length:
         #     # Histogram: Number of tokens in reports.
         #     tokens_per_report = self.tf_reports[self.report_vocabulary].sum(axis=1)
