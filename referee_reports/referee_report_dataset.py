@@ -30,7 +30,7 @@ class RefereeReportDataset:
     _output_directory: str
     _seed: int
     _ngrams: int
-    _reports_vocabulary: np.ndarraygit
+    _reports_vocabulary: np.ndarray
     models: dict
 
     def __init__(self, cleaned_pickled_reports_file: str, cleaned_pickled_papers_file: str, output_directory: str, seed: int):
@@ -287,7 +287,7 @@ class RefereeReportDataset:
                                            .agg(tally_referee_genders)
                                            .value_counts())
         fig, ax = plt.subplots()
-        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, y="")
+        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, y="",  autopct='%.2f%%')
         plt.savefig(os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
         plt.close(fig)
 
@@ -295,18 +295,18 @@ class RefereeReportDataset:
         for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions.png", "referee_recommendations.png"]):
             distribution = self._df[variable].value_counts().rename()
             fig, ax = plt.subplots()
-            distribution.plot.pie(ax=ax, colors=Colors.OI_colors, y="")
+            distribution.plot.pie(ax=ax, colors=Colors.OI_colors, y="", autopct='%.2f%%')
             plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
             plt.close(fig)
 
         # Plot distribution of decision and recommendation, separately by gender.
         for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions_by_gender.png", "referee_recommendations_by_gender.png"]):
-            distribution_female = self._df[self._df['_female_'] == 1, variable].value_counts()
-            distribution_male = self._df[self._df['_female_'] == 0, variable].value_counts()
+            distribution_female = self._df.loc[self._df['_female_'] == 1, variable].value_counts()
+            distribution_male = self._df.loc[self._df['_female_'] == 0, variable].value_counts()
             fig, (ax1, ax2) = plt.subplots(1, 2)
-            distribution_female.plot.pie(ax=ax1, colors=Colors.OI_colors, y="")
+            distribution_female.plot.pie(ax=ax1, colors=Colors.OI_colors, y="", autopct='%.2f%%')
             ax1.set_title("Female Referees")
-            distribution_male.plot.pie(ax=ax2, colors=Colors.OI_colors, y="")
+            distribution_male.plot.pie(ax=ax2, colors=Colors.OI_colors, y="", autopct='%.2f%%')
             ax2.set_title("Non-female Referees")
             plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
             plt.close(fig)
