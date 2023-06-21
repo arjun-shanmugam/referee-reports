@@ -12,10 +12,10 @@ import numpy as np
 
 from referee_reports.constants import Colors
 from referee_reports.pkldir.decode import decode
-from referee_reports.pkldir.encode import encode
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from referee_reports.figure_utilities import plot_histogram, save_figure_and_close
 
 from referee_reports.models import OLSRegression, RegularizedRegression
 
@@ -288,16 +288,14 @@ class RefereeReportDataset:
                                            .value_counts())
         fig, ax = plt.subplots()
         referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, y="",  autopct='%.2f%%')
-        plt.savefig(os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
-        plt.close(fig)
+        save_figure_and_close(fig, os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
 
         # Plot distribution of decision and recommendation.
         for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions.png", "referee_recommendations.png"]):
             distribution = self._df[variable].value_counts().rename()
             fig, ax = plt.subplots()
             distribution.plot.pie(ax=ax, colors=Colors.OI_colors, y="", autopct='%.2f%%')
-            plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
-            plt.close(fig)
+            save_figure_and_close(fig, os.path.join(self._output_directory, filename))
 
         # Plot distribution of decision and recommendation, separately by gender.
         for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions_by_gender.png", "referee_recommendations_by_gender.png"]):
@@ -308,168 +306,14 @@ class RefereeReportDataset:
             ax1.set_title("Female Referees")
             distribution_male.plot.pie(ax=ax2, colors=Colors.OI_colors, y="", autopct='%.2f%%')
             ax2.set_title("Non-female Referees")
-            plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
-            plt.close(fig)
+            save_figure_and_close(fig, os.path.join(self._output_directory, filename))
 
         # Plot distribution of report lengths.
-
-
-        # if not normalize_documents_by_length:
-        #     # Histogram: Number of tokens in reports.
-        #     tokens_per_report = self.tf_reports[self.report_vocabulary].sum(axis=1)
-        #     xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
-        #
-        #     Note: This figure is a histogram of the number of tokens in the sample reports after all cleaning,
-        #     sample restriction, vectorization, and removal of low-frequency tokens. Equivalently, this figure
-        #     gives the distribution of report lengths in tokens immediately before analysis.
-        #             '''
-        #     plot_histogram(x=tokens_per_report,
-        #                    filepath=os.path.join(self.path_to_output,
-        #                                          "hist_tokens_per_report_immediately_before_analysis.png"),
-        #                    title="Number of Tokens in Each Report (" + str(self.ngrams) + "-Grams)",
-        #                    xlabel=xlabel)
-        #
-        #     # Histogram: Number of tokens in papers.
-        #     tokens_per_paper = self.tf_papers[self.report_vocabulary].sum(axis=1)
-        #     xlabel = '''Length (''' + str(self.ngrams) + '''-Gram Tokens)
-        #
-        #     Note: This figure is a histogram of the number of tokens in the sample papers after cleaning,
-        #     sample restriction, restriction to introductions, removal of thank yous, vectorization, and
-        #     removal of low-frequency tokens. Equivalently, this figure gives the distribution of paper
-        #     lengths in tokens immediately before analysis. Note that this figure only counts tokens
-        #     which also appear somewhere in the corpus of reports.
-        #     '''
-        #     plot_histogram(x=tokens_per_paper,
-        #                    filepath=os.path.join(self.path_to_output,
-        #                                          "hist_tokens_per_paper_immediately_before_analysis.png"),
-        #                    title="Number of Tokens in Each Paper (" + str(self.ngrams) + "-Grams)",
-        #                    xlabel=xlabel)
-
-        # """
-
-        # # Histogram: Counts and log counts of token in the paper-adjusted D.T.M. for the reports.
-        # if adjust_reports_with_papers:
-        #     if normalize_documents_by_length:
-        #         # Histogram: Frequencies in the paper-adjusted D.T.M. for the reports.
-        #         token_counts = self.tf_reports_adjusted[self.report_vocabulary].to_numpy().flatten()
-        #         xlabel = """Values in Paper-Adjusted Matrix
-
-        #             Note: This figure is a histogram of the values in the normalized
-        #             paper-adjusted reports matrix. To calculate this figure, I first
-        #             add one to every cell of the reports D.T.M. and the papers D.T.M.
-        #             Then, I normalize each cell of the reports D.T.M. by the sum of
-        #             the row containing that cell. I normalize each cell of the papers
-        #             D.T.M. in the same way. Then, each row (i, j) of the normalized
-        #             reports D.T.M. is divided element-wise by row j of the
-        #             normalized papers D.T.M.
-        #             """
-        #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.output_directory, "hist_paper_adjusted_matrix_immediately_before_analysis.png"),
-        #                     title="Distribution of Paper-Adjusted Token Frequencies in Reports (" + str(self.ngrams) + "-Grams)",
-        #                     xlabel=xlabel)
-        #         # Histogram: Log frequencies in the paper-adjusted D.T.M. for the reports.
-        #         token_counts = np.log(self.tf_reports_adjusted[self.report_vocabulary] + 1).to_numpy().flatten()
-        #         xlabel = """Values in Paper-Adjusted Matrix
-
-        #                     Note: This figure is a histogram of the values in the normalized
-        #                     paper-adjusted reports matrix. To calculate this figure, I first
-        #                     add one to every cell of the reports D.T.M. and the papers D.T.M.
-        #                     Then, I normalize each cell of the reports D.T.M. by the sum of
-        #                     the row containing that cell. I normalize each cell of the papers
-        #                     D.T.M. in the same way. Then, each row (i, j) of the normalized
-        #                     reports D.T.M. is divided element-wise by row j of the normalized
-        #                     papers D.T.M. Lastly, I add 1 to each cell of this matrix and then
-        #                     take the base ten log of each cell.
-        #                     """
-        #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.output_directory, "hist_log_paper_adjusted_matrix_immediately_before_analysis.png"),
-        #                     title="Distribution of Log-Transformed Paper-Adjusted Token Frequencies in Reports (" + str(self.ngrams) + "-Grams)",
-        #                     xlabel=xlabel)
-        #     else:
-        #         # Histogram: Counts in the paper-adjusted D.T.M. for the reports.
-        #         token_counts = self.tf_reports_adjusted[self.report_vocabulary].to_numpy().flatten()
-        #         xlabel = """Values in Paper-Adjusted Matrix
-
-        #                     Note: This figure is a histogram of the values in the paper-adjusted
-        #                     reports D.T.M. To produce the paper-adjusted reports D.T.M., I
-        #                     subtract from each row (i, j) of the reports D.T.M. row j of the
-        #                     papers D.T.M.
-        #                     """
-        #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.output_directory, "hist_paper_adjusted_matrix_immediately_before_analysis.png"),
-        #                     title="Distribution of Paper-Adjusted Token Counts in Reports (" + str(self.ngrams) + "-Grams)",
-        #                     xlabel=xlabel)
-        #         # Histogram: Log counts in the paper-adjusted D.T.M. for the reports.
-        #         token_counts = np.log(self.tf_reports_adjusted[self.report_vocabulary] + 1).to_numpy().flatten()
-        #         xlabel = """Values in Paper-Adjusted Matrix
-
-        #                     Note: This figure is a histogram of the values in the paper-adjusted
-        #                     reports D.T.M. To produce the paper-adjusted reports D.T.M., I
-        #                     subtract from each row (i, j) of the reports D.T.M. row j of the
-        #                     papers D.T.M. Then, I add 1 to each cell of this D.T.M. and then
-        #                     take the base ten log of each cell.
-        #                     """
-        #         plot_histogram(x=pd.Series(token_counts),
-        #                     filepath=os.path.join(self.output_directory, "hist_log_paper_adjusted_matrix_immediately_before_analysis.png"),
-        #                     title="Distribution of Log Paper-Adjusted Token Counts in Reports (" + str(self.ngrams) + "-Grams)",
-        #                     xlabel=xlabel)
-
-        # # Histogram: Counts of each token in the reports.
-        # token_counts = self.tf_reports[self.report_vocabulary].sum(axis=0)
-        # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.output_directory,
-        #                                      "hist_token_counts_immediately_before_analysis_reports.png"),
-        #                title="Distribution of Total Appearances Across Tokens in Reports (" + str(self.ngrams) + "-Grams)",
-        #                xlabel='''Number of Times Token Appears
-
-        #                         This figure plots the distribution of tokens' total apperances across reports.
-        #                         To produce this figure, I first calculate the total number of times each token appears
-        #                         across all reports. I then bin tokens according to those sums and display the results
-        #                         above.
-        #                ''')
-
-        # # Histogram: Counts of each token in the papers.
-        # token_counts = self.tf_papers[self.report_vocabulary].sum(axis=0)
-        # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.output_directory,
-        #                                      "hist_token_counts_immediately_before_analysis_papers.png"),
-        #                title="Distribution of Total Apperances Across Tokens in Papers (" + str(self.ngrams) + "-Grams)",
-        #                xlabel='''Number of Times Token Appears
-
-        #                This figure plots the distribution of tokens' total appearances across papers.
-        #                To produce this figure, I first calculate the total number of times each token appears
-        #                across all papers. I then bin tokens according to those sums and display the results above.
-        #                ''')
-
-        # # Histogram: Counts of each token in the reports, log(x+1) transformed.
-        # token_counts = np.log(self.tf_reports[self.report_vocabulary] + 1).sum(axis=0) 
-        # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.output_directory,
-        #                                      "hist_token_log_counts_immediately_before_analysis_reports.png"),
-        #                title="Distribution of log(x+1)-Transformed Counts Across Reports (" + str(self.ngrams) + "-Grams)",
-        #                xlabel='''Sum of log(x+1)-Transformed Counts
-
-        #                This figure plots the distribution of tokens' log(x+1)-transformed counts,
-        #                summed across reports. To produce this figure, I add 1 to each cell of the 
-        #                D.T.M. for the reports. Then, I take the natural log of each cell. Lastly,
-        #                I sum the D.T.M. across reports (rows) and bin the tokens according to the
-        #                resulting sums.
-        #                ''')
-
-        # # Histogram: Counts of each token in the papers, log(x+1) transformed.
-        # token_counts = np.log(self.tf_papers[self.report_vocabulary] + 1).sum(axis=0)
-        # plot_histogram(x=token_counts,
-        #                filepath=os.path.join(self.output_directory,
-        #                                      "hist_token_log_counts_immediately_before_analysis_papers.png"),
-        #                title="Distribution of log(x+1)-Transformed Counts Across Papers (" + str(self.ngrams) + "-Grams)",
-        #                xlabel='''Sum of log(x+1)-Transformed Counts
-
-        #                This figure plots the distribution of tokens' log(x+1)-transformed counts, 
-        #                summed across papers. To produce this figure, I add 1 to each cell of the 
-        #                D.T.M. for the reports. Then, I take the natural log of each cell. Lastly,
-        #                I sum the D.T.M. across papers (rows) and bin the tokens according to the
-        #                resulting sums.
-        #                ''')
+        tokens_per_report = self._df[self._reports_vocabulary].sum(axis=1)
+        xlabel = "Length"
+        fig, ax = plt.subplots()
+        plot_histogram(ax, tokens_per_report, xlabel=xlabel)
+        save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths.png"))
 
         # """
 
