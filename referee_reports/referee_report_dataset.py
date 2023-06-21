@@ -288,14 +288,14 @@ class RefereeReportDataset:
                                            .agg(tally_referee_genders)
                                            .value_counts())
         fig, ax = plt.subplots()
-        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, y="", autopct='%.2f%%')
+        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, ylabel="", autopct='%.2f%%')
         save_figure_and_close(fig, os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
 
         # Plot distribution of decision and recommendation.
         for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions.png", "referee_recommendations.png"]):
             distribution = self._df[variable].value_counts().rename()
             fig, ax = plt.subplots()
-            distribution.plot.pie(ax=ax, colors=Colors.OI_colors, y="", autopct='%.2f%%')
+            distribution.plot.pie(ax=ax, colors=Colors.OI_colors, ylabel="", autopct='%.2f%%')
             save_figure_and_close(fig, os.path.join(self._output_directory, filename))
 
         # Plot distribution of decision and recommendation, separately by gender.
@@ -303,9 +303,9 @@ class RefereeReportDataset:
             distribution_female = self._df.loc[self._df['_female_'] == 1, variable].value_counts()
             distribution_male = self._df.loc[self._df['_female_'] == 0, variable].value_counts()
             fig, (ax1, ax2) = plt.subplots(1, 2)
-            distribution_female.plot.pie(ax=ax1, colors=Colors.OI_colors, y="", autopct='%.2f%%')
+            distribution_female.plot.pie(ax=ax1, colors=Colors.OI_colors, ylabel="", autopct='%.2f%%')
             ax1.set_title("Female Referees")
-            distribution_male.plot.pie(ax=ax2, colors=Colors.OI_colors, y="", autopct='%.2f%%')
+            distribution_male.plot.pie(ax=ax2, colors=Colors.OI_colors, ylabel="", autopct='%.2f%%')
             ax2.set_title("Non-female Referees")
             save_figure_and_close(fig, os.path.join(self._output_directory, filename))
 
