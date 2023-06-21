@@ -117,13 +117,13 @@ def plot_histogram(ax: Axes,
     labels = []
     if 'min' in summary_statistics:
         statistics.append(np.min(x))
-        labels.append(f"min: {np.min(x).round(decimal_places)}")
+        labels.append(f"min: {float(np.min(x)).round(decimal_places)}")
     if 'med' in summary_statistics:
         statistics.append(np.median(x))
-        labels.append(f"med: {np.median(x).round(decimal_places)}")
+        labels.append(f"med: {float(np.median(x)).round(decimal_places)}")
     if 'max' in summary_statistics:
         statistics.append(np.max(x))
-        labels.append(f"max: {np.max(x).round(decimal_places)}")
+        labels.append(f"max: {float(np.max(x)).round(decimal_places)}")
     for statistic, label in zip(statistics, labels):
         plot_labeled_vline(ax=ax,
                            x=statistic,
