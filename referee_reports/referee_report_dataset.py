@@ -30,6 +30,7 @@ class RefereeReportDataset:
     _output_directory: str
     _seed: int
     _ngrams: int
+    _reports_vocabulary: np.ndarraygit
     models: dict
 
     def __init__(self, cleaned_pickled_reports_file: str, cleaned_pickled_papers_file: str, output_directory: str, seed: int):
@@ -50,6 +51,7 @@ class RefereeReportDataset:
         self._output_directory = output_directory
         self._seed = seed
         self._df = pd.DataFrame(index=self._reports_df.index)
+        self._reports_vocabulary = np.empty(1)
         self.models = {}
         np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
 
@@ -110,6 +112,7 @@ class RefereeReportDataset:
 
         # Concatenate DTM with the rest of the test_data.
         dtm = pd.DataFrame(dtm, self._reports_df.index, columns=vectorizer.get_feature_names())
+        self._reports_vocabulary = vectorizer.get_feature_names()
         self._df = pd.concat([self._df, dtm], axis=1)
 
     def _merge_with_referee_characteristics(self):
@@ -289,7 +292,7 @@ class RefereeReportDataset:
         plt.close(fig)
 
         # Plot distribution of decision and recommendation.
-        for variable, filename in zip('_decision_', '_recommendation_', ["referee_decisions.png", "referee_recommendations.png"]):
+        for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions.png", "referee_recommendations.png"]):
             distribution = self._df[variable].value_counts()
             fig, ax = plt.subplots()
             distribution.plot.pie(ax=ax, colors=Colors.OI_colors)
@@ -297,7 +300,7 @@ class RefereeReportDataset:
             plt.close(fig)
 
         # Plot distribution of decision and recommendation, separately by gender.
-        for variable, filename in zip('_decision_', '_recommendation_', ["referee_decisions_by_gender.png", "referee_recommendations_by_gender.png"]):
+        for variable, filename in zip(['_decision_', '_recommendation_'], ["referee_decisions_by_gender.png", "referee_recommendations_by_gender.png"]):
             distribution_female = self._df[self._df['_female_'] == 1, variable].value_counts()
             distribution_male = self._df[self._df['_female_'] == 0, variable].value_counts()
             fig, (ax1, ax2) = plt.subplots(1, 2)
@@ -307,6 +310,9 @@ class RefereeReportDataset:
             ax2.set_title("Non-female Referees")
             plt.savefig(os.path.join(self._output_directory, filename), bbox_inches='tight')
             plt.close(fig)
+
+        # Plot distribution of report lengths.
+
 
         # if not normalize_documents_by_length:
         #     # Histogram: Number of tokens in reports.
