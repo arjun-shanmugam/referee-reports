@@ -319,7 +319,8 @@ class RefereeReportDataset:
 
         # Plot distribution of report lengths, separately by gender.
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-        for gender, title, ax, color in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2], constants.Colors.P1, constants.Colors.P2):
+        for gender, title, ax, color in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2], constants.Colors.P1,
+                                            constants.Colors.P2):
             report_lengths = self._df.loc[self._df['_female_'] == gender, self._reports_vocabulary].sum(axis=1)
             plot_histogram(ax, x=report_lengths, title=title, xlabel="Length")
         save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths_by_gender.png"))
@@ -335,75 +336,37 @@ class RefereeReportDataset:
         plot_histogram(ax=ax, x=num_reports_where_word_appears, title="", xlabel=xlabel)
         save_figure_and_close(fig, os.path.join("histogram_report_appearances.png"))
 
+        # Print most common words for men and women.
+        male_occurrences_per_word = (self._df.loc[self._df['_female_'] == 0, self._reports_vocabulary]
+                                     .sum(axis=0)
+                                     .transpose()
+                                     .sort_values(ascending=False)
+                                     .iloc[:50]
+                                     .round(3)
+                                     .rename("Most Common Words, Reports by Non-Females")
+                                     .reset_index())
+        male_occurrences_per_word = (male_occurrences_per_word['index']
+                                     + ":"
+                                     + male_occurrences_per_word["Most Common Words, Reports by Non-Females"].astype(str))
+        male_occurrences_per_word = male_occurrences_per_word.rename("\textbf{Most Common Words, Reports by Non-Females}")
+        female_occurrences_per_word = (self._df.loc[self._df['_female_'] == 1, self._reports_vocabulary]
+                                       .sum(axis=0)
+                                       .transpose()
+                                       .sort_values(ascending=False)
+                                       .iloc[:50]
+                                       .round(3)
+                                       .rename("Most Common Words, Reports by Females")
+                                       .reset_index())
+        female_occurrences_per_word = (female_occurrences_per_word['index']
+                                       + ":"
+                                       + female_occurrences_per_word["Most Common Words, Reports by Females"].astype(str))
+        female_occurrences_per_word = female_occurrences_per_word.rename("\textbf{Most Common Words, Reports by Females}")
+        pd.concat([female_occurrences_per_word, male_occurrences_per_word], axis=1).to_latex(os.path.join(self._output_directory,
+                                                                                                          "most_common_words_by_gender.tex"),
+                                                                                             index=False,
+                                                                                             escape=False,
+                                                                                             )
 
-
-        # # Hist: Average length of male vs. female reports immediately before analysis.
-        # report_lengths = (
-        #     self.tf_reports
-        #     .sum(axis=1)
-        # )
-        # male_report_lengths = report_lengths.loc[self._df['_female_'] == 0]
-        # male_report_lengths_mean = male_report_lengths.mean().round(3)
-        # male_report_lengths_se = male_report_lengths.sem().round(3)
-        # female_report_lengths = report_lengths.loc[self._df['_female_'] == 1]
-        # female_report_lengths_mean = female_report_lengths.mean().round(3)
-        # female_report_lengths_se = female_report_lengths.sem().round(3)
-        #
-        # fig, ax = plt.subplots(1, 1)
-        # plot_hist(ax=ax,
-        #           x=male_report_lengths,
-        #           title="Distribution of Male-Written vs. Female-Written Report Lengths",
-        #           xlabel='Report Length',
-        #           ylabel='Normalized Frequency',
-        #           alpha=0.5,
-        #           color=OI_constants.male_color.value,
-        #           summary_statistics_linecolors=OI_constants.male_color.value,
-        #           label="Male Reports \n Mean length: " + str(male_report_lengths_mean) + " (SE: " + str(male_report_lengths_se) + ")",
-        #           summary_statistics=['median'])
-        # plot_hist(ax=ax,
-        #           x=female_report_lengths,
-        #           title="Distribution of Male-Written vs. Female-Written Report Lengths",
-        #           xlabel='Report Length',
-        #           ylabel='Normalized Frequency',
-        #           alpha=0.5,
-        #           color=OI_constants.female_color.value,
-        #           summary_statistics_linecolors=OI_constants.female_color.value,
-        #           label="Female Reports \n Mean length: " + str(female_report_lengths_mean) + " (SE: " + str(female_report_lengths_se) + ")",
-        #           summary_statistics=['median'])
-        # ax.legend(loc='best', fontsize='x-small')
-        # plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_report_lengths_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
-        # plt.close(fig)
-        #
-        # # Table: Most common words for men and women (R).
-        # occurrences_by_gender = (
-        #     pd.concat([self.tf_reports, self._df['_female_']], axis=1)
-        #     .groupby(by='_female_')
-        #     .sum()
-        #     .transpose()
-        # )
-        #
-        # male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
-        #                              name="Most Common Words in Male-Written Reports").reset_index().iloc[:50]
-        # male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
-        #     "\textbf{Most Common Words in Male-Written Reports}")
-        # female_occurrences = pd.Series(occurrences_by_gender[1].sort_values(ascending=False),
-        #                                name="Most Common Words in Female-Written Reports").reset_index().iloc[:50]
-        # female_occurrences = (female_occurrences['index'] + ": " + female_occurrences["Most Common Words in Female-Written Reports"].astype(str)).rename(
-        #     "\textbf{Most Common Words in Female-Written Reports}")
-        # pd.concat([male_occurrences, female_occurrences], axis=1).to_latex(
-        #     os.path.join(self.path_to_output, "table_most_common_words_by_gender_R_" + str(self.ngrams) + "_grams.tex"),
-        #     index=False,
-        #     escape=False,
-        #     float_format="%.3f")
-        #
-        # # Table: Most common words for men and women (NR).
-        # report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.
-        # occurrences_by_gender = (
-        #     pd.concat([self.tf_reports.div(report_lengths, axis=0), self._df['_female_']], axis=1)
-        #     .groupby(by='_female_')
-        #     .sum()
-        #     .transpose()
-        # )
         # male_occurrences = pd.Series(occurrences_by_gender[0].sort_values(ascending=False),
         #                              name="Most Common Words in Male-Written Reports").reset_index().iloc[:50].round(3)
         # male_occurrences = (male_occurrences['index'] + ": " + male_occurrences["Most Common Words in Male-Written Reports"].astype(str)).rename(
