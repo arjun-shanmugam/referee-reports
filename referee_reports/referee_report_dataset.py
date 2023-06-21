@@ -282,12 +282,13 @@ class RefereeReportDataset:
             male_referees = (referee_genders_for_single_paper == 0).sum()
             female_referees = (referee_genders_for_single_paper == 1).sum()
             return f"{female_referees} female, {male_referees} male"
+
         referee_gender_breakdown_counts = (self._df['_female_']
                                            .groupby(level=0)
                                            .agg(tally_referee_genders)
                                            .value_counts())
         fig, ax = plt.subplots()
-        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, y="",  autopct='%.2f%%')
+        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors, y="", autopct='%.2f%%')
         save_figure_and_close(fig, os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
 
         # Plot distribution of decision and recommendation.
@@ -315,26 +316,19 @@ class RefereeReportDataset:
         plot_histogram(ax, tokens_per_report, xlabel=xlabel)
         save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths.png"))
 
-        # """
+        # Plot distribution of report lengths, separately by gender.
 
-        # Histogram: Number of reports in which tokens appear.
-        # num_reports_where_word_appears = (self.tf_reports
-        #                                   .mask(self.tf_reports > 0, 1)
-        #                                   .sum(axis=0)
-        #                                   .transpose()
-        #                                   )
-        #
-        # xlabel = """Number of Reports
-        #
-        # This figure plots the distribution over the number of reports in which each token appears.
-        # It is produced after all cleaning but before the removal of low-frequency tokens. To produce this figure,
-        # I calculate the number of reports in which each token appears at least once. I sort tokens into bins
-        # based on those values to produce this figure. """
-        # plot_histogram(x=num_reports_where_word_appears,
-        #                title="Number of Reports in Which Tokens Appear (" + str(self.ngrams) + "-grams)",
-        #                xlabel=xlabel,
-        #                filepath=os.path.join(self.path_to_output, 'hist_num_reports_where_tokens_appear_' + str(self.ngrams) + '_grams.png'))
-        #
+        # Plot distribution of number of reports in which words appear.
+        num_reports_where_word_appears = (self._df[self._reports_vocabulary]
+                                          .mask(self._df[self._reports_vocabulary] > 0, 1)
+                                          .sum(axis=0)
+                                          .transpose()
+                                          )
+        fig, ax = plt.subplots()
+        xlabel = "Number of Reports"
+        plot_histogram(ax=ax, x=num_reports_where_word_appears, title="", xlabel=xlabel)
+        save_figure_and_close(fig, os.path.join("histogram_report_appearances.png"))
+
         # # Hist: Average length of male vs. female reports immediately before analysis.
         # report_lengths = (
         #     self.tf_reports
@@ -416,52 +410,6 @@ class RefereeReportDataset:
         #     escape=False,
         #     float_format="%.3f")
         #
-        # # Hist: Cosine similarity between NR vectors and NP vectors, separately for males and females.
-        # report_lengths = self.tf_reports.sum(axis=1)  # Calculate NR_ij.
-        # NR = self.tf_reports.div(report_lengths, axis=0)
-        # paper_lengths = self.tf_papers.sum(axis=1)  # Calculate NP_j
-        # NP = self.tf_papers.div(paper_lengths, axis=0)
-        # index = pd.MultiIndex.from_frame(self._df[['_paper_', '_num_']], names=['_paper_', '_num_'])
-        # columns = self._df['_paper_']
-        # cosine_similarities = pd.DataFrame(cosine_similarity(NR, NP), index=index, columns=columns)
-        # cosine_similarities = pd.Series(np.diag(cosine_similarities), index=cosine_similarities.index, name='similarity')
-        # genders = self._df[['_female_', '_paper_', '_num_']].set_index(['_paper_', '_num_'])
-        # cosine_similarities_and_genders = pd.concat([cosine_similarities, genders], axis=1)
-        # cosine_similarities_males = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 0, 'similarity']
-        # cosine_similarities_females = cosine_similarities_and_genders.loc[cosine_similarities_and_genders['_female_'] == 1, 'similarity']
-        # fig, ax = plt.subplots(1, 1)
-        #
-        # male_mean = cosine_similarities_males.mean().round(3)
-        # male_se = cosine_similarities_males.sem().round(3)
-        # plot_hist(ax=ax,
-        #           x=cosine_similarities_males,
-        #           title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
-        #           xlabel='Cosine Similarity',
-        #           ylabel='Normalized Frequency',
-        #           alpha=0.5,
-        #           color=OI_constants.male_color.value,
-        #           summary_statistics_linecolors=OI_constants.male_color.value,
-        #           label="Male Reports \n Mean Cosine Similarity: " + str(male_mean) + " (SE: " + str(male_se) + ")",
-        #           summary_statistics=['median'])
-        #
-        # female_mean = cosine_similarities_females.mean().round(3)
-        # female_se = cosine_similarities_females.sem().round(3)
-        # plot_hist(ax=ax,
-        #           x=cosine_similarities_females,
-        #           title="Distribution of Cosine Similarity Between Reports and Their Associated Papers",
-        #           xlabel='Cosine Similarity',
-        #           ylabel='Normalized Frequency',
-        #           alpha=0.5,
-        #           color=OI_constants.female_color.value,
-        #           summary_statistics_linecolors=OI_constants.female_color.value,
-        #           label="Female Reports \n Mean Cosine Similarity: " + str(female_mean) + " (SE: " + str(female_se) + ")",
-        #           summary_statistics=['median'])
-        # ax.legend(loc='best', fontsize='x-small')
-        # plt.savefig(os.path.join(self.path_to_output, "hist_male_vs_female_cosine_similarity_NR_NP_" + str(self.ngrams) + "_grams.png"), bbox_inches='tight')
-        # plt.close(fig)
-
-    def get_vocabulary(self):
-        return self.report_vocabulary
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
