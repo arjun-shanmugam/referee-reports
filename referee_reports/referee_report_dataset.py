@@ -333,7 +333,7 @@ class RefereeReportDataset:
         fig, ax = plt.subplots()
         xlabel = "Number of Reports"
         plot_histogram(ax=ax, x=num_reports_where_word_appears, title="", xlabel=xlabel)
-        save_figure_and_close(fig, os.path.join("histogram_report_appearances.png"))
+        save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_appearances.png"))
 
         # Print most common words for men and women.
         male_occurrences_per_word = (self._df.loc[self._df['_female_'] == 0, self._reports_vocabulary]
