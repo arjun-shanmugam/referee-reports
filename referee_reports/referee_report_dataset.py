@@ -284,25 +284,26 @@ class RefereeReportDataset:
                                            .agg(tally_referee_genders)
                                            .value_counts())
         fig, ax = plt.subplots()
-        referee_gender_breakdown_counts.pie(ax=ax, colors=Colors.OI_colors)
+        referee_gender_breakdown_counts.plot.pie(ax=ax, colors=Colors.OI_colors)
         ax.set_title("Referee Gender Across Papers")
         plt.savefig(os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
         plt.close(fig)
 
         # Plot distribution of decision.
+        referee_decisions = self._df['_decision_'].value_counts()
+        fig, ax = plt.subplots()
+        referee_decisions.plot.pie(ax=ax, colors=Colors.OI_colors)
+        plt.savefig(os.path.join(self._output_directory, "referee_decisions.png"), bbox_inches='tight')
+        plt.close(fig)
+
+        # Plot distribution of recommendation.
+        referee_recommendations = self._df['_recommendation_'].value_counts()
+        fig, ax = plt.subplots()
+        referee_recommendations.plot.pie(ax=ax, colors=Colors.OI_colors)
+        plt.savefig(os.path.join(self._output_directory, "referee_recommendations.png"), bbox_inches='tight')
+        plt.close(fig)
 
 
-        # # Pie chart: Breakdown of decision and recommendation
-        # decision_breakdown = self._df['_decision_'].value_counts()
-        # plot_pie(x=decision_breakdown,
-        #          filepath=os.path.join(self.path_to_output, 'pie_decision.png'),
-        #          title="Breakdown of Referee Decisions")
-        #
-        # recommendation_breakdown = self._df['_recommendation_'].value_counts()
-        # plot_pie(x=recommendation_breakdown,
-        #          filepath=os.path.join(self.path_to_output, 'pie_recomendation.png'),
-        #          title="Breakdown of Referee Recommendation")
-        #
         # # Pie chart: Breakdown of referee decision and recommendation by gender.
         # plot_pie_by(x=self._df['_decision_'],
         #             by=self._df['_female_'],
