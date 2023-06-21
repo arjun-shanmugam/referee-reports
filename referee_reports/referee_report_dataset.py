@@ -317,6 +317,11 @@ class RefereeReportDataset:
         save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths.png"))
 
         # Plot distribution of report lengths, separately by gender.
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        for gender, title, ax in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2]):
+            report_lengths = self._df.loc[self._df['_female_'] == gender, self._reports_vocabulary].sum(axis=1)
+            plot_histogram(ax, x=report_lengths, title=title, xlabel="Length")
+        save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths_by_gender.png"))
 
         # Plot distribution of number of reports in which words appear.
         num_reports_where_word_appears = (self._df[self._reports_vocabulary]
@@ -328,6 +333,8 @@ class RefereeReportDataset:
         xlabel = "Number of Reports"
         plot_histogram(ax=ax, x=num_reports_where_word_appears, title="", xlabel=xlabel)
         save_figure_and_close(fig, os.path.join("histogram_report_appearances.png"))
+
+
 
         # # Hist: Average length of male vs. female reports immediately before analysis.
         # report_lengths = (
