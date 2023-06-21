@@ -273,10 +273,7 @@ class RefereeReportDataset:
                                float_format="%.3f")
 
     # TODO: RESUME HERE
-    def produce_summary_statistics(self,
-                                   adjust_reports_with_papers: bool,
-                                   normalize_documents_by_length: bool
-                                   ):
+    def produce_summary_statistics(self):
         # Plot number of referees on each paper of each gender.
         def tally_referee_genders(referee_genders_for_single_paper: pd.DataFrame):
             male_referees = (referee_genders_for_single_paper == 0).sum()
@@ -292,7 +289,7 @@ class RefereeReportDataset:
         plt.savefig(os.path.join(self._output_directory, "referee_count_and_gender.png"), bbox_inches='tight')
         plt.close(fig)
 
-
+        # Plot distribution of decision.
 
 
         # # Pie chart: Breakdown of decision and recommendation
