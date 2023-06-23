@@ -254,7 +254,7 @@ class RefereeReportDataset:
 
         # Get smallest nonzero coefficients; concatenate them with the associated token.
         bottom_coefficients = coefficients_sorted.iloc[-num_coefs_to_report:]
-        bottom_coefficients = bottom_coefficients[top_coefficients != 0]
+        bottom_coefficients = bottom_coefficients[bottom_coefficients != 0]
         bottom_coefficients = bottom_coefficients.reset_index()['index'] + ": " + bottom_coefficients.round(3).astype(str)
 
         results_table = pd.concat([top_coefficients, bottom_coefficients, final_parameters], axis=1)
