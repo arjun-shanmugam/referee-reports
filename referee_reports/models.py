@@ -224,7 +224,7 @@ class RegularizedRegression(Regression):
                                  "$w_{adjusted}^{L1}^*$",
                                  "Binary cross-entropy on final refit: ",
                                  "Accuracy on final refit: "]
-        final_parameter_values = [N
+        final_parameter_values = [N,
                                   portion_of_coefficients_0,
                                   alpha_star,
                                   top_mean_test_loss,
