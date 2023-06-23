@@ -206,12 +206,14 @@ class RegularizedRegression(Regression):
                                            columns=['mean_loss', 'std_loss'])
 
         # Get final parameters.
+        N = len(self._X_data)
         portion_of_coefficients_0 = (coefficients_sorted == 0).mean()  # Portion of coefficients equal to 0.
         (_, _, alpha_star, top_mean_test_loss, top_se_test_loss, w_l1_star, alpha_star_adjusted, top_adjusted_mean_test_loss, top_adjusted_se_test_loss,
          w_l1_star_adjusted) = get_optimal_parameters(cv_results_df, penalty=penalty, N=N, cv_folds=cv_folds)
         loss_after_final_refit = log_loss(self._y_data, grid_search_result.best_estimator_.predict_proba(self._X_data))
         accuracy_after_final_refit = grid_search_result.best_estimator_.score(self._X_data, self._y_data)
-        final_parameter_names = ["Portion of coefficients equal to 0:",
+        final_parameter_names = ["N:"
+                                 "Portion of coefficients equal to 0:",
                                  "$\\alpha^{*}$: ",
                                  "$\\bar{p}_{\\alpha^*}$: ",
                                  "$SE_{\\alpha^*}$: ",
@@ -222,7 +224,8 @@ class RegularizedRegression(Regression):
                                  "$w_{adjusted}^{L1}^*$",
                                  "Binary cross-entropy on final refit: ",
                                  "Accuracy on final refit: "]
-        final_parameter_values = [portion_of_coefficients_0,
+        final_parameter_values = [N
+                                  portion_of_coefficients_0,
                                   alpha_star,
                                   top_mean_test_loss,
                                   top_se_test_loss,
