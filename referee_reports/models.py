@@ -212,7 +212,7 @@ class RegularizedRegression(Regression):
          w_l1_star_adjusted) = get_optimal_parameters(cv_results_df, penalty=penalty, N=N, cv_folds=cv_folds)
         loss_after_final_refit = log_loss(self._y_data, grid_search_result.best_estimator_.predict_proba(self._X_data))
         accuracy_after_final_refit = grid_search_result.best_estimator_.score(self._X_data, self._y_data)
-        final_parameter_names = ["N:"
+        final_parameter_names = ["N:",
                                  "Portion of coefficients equal to 0:",
                                  "$\\alpha^{*}$: ",
                                  "$\\bar{p}_{\\alpha^*}$: ",
