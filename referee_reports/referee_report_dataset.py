@@ -55,13 +55,7 @@ class RefereeReportDataset:
         self.models = {}
         np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
 
-        # self.report_dtm = pd.DataFrame()
-        # self.report_vocabulary = []
-        # self.tf_reports = pd.DataFrame()
-        # self.tf_papers = pd.DataFrame()
-        # self.tf_reports_adjusted = pd.DataFrame()
-        # self.models = {}
-        # self.ngrams = None
+
 
     def build_df(self, text_representation: str, ngrams: int, restrict_to_papers_with_mixed_gender_referees: bool, balance_sample_by_gender: bool):
 
@@ -366,6 +360,8 @@ class RefereeReportDataset:
                                                                                              escape=False,
                                                                                              )
 
+    def get_reports_vocabulary(self):
+        return self._reports_vocabulary
     # TODO: RESUME HERE
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
