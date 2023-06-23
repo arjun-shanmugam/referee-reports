@@ -163,6 +163,7 @@ class RegularizedRegression(Regression):
             seed: int,
             alphas: np.ndarray,
             adjust_alpha: bool,
+            n_jobs: int=1,
             l1_ratios: np.ndarray = None):
 
         # Error check penalty argument.
@@ -190,7 +191,8 @@ class RegularizedRegression(Regression):
                                    param_grid=param_grid,
                                    scoring=['neg_log_loss', 'accuracy'],
                                    refit=lambda cv_results: custom_refit(cv_results, adjust_alpha, penalty, N, cv_folds),
-                                   cv=cv)
+                                   cv=cv,
+                                   n_jobs=n_jobs)
         grid_search_result = grid_search.fit(self._X_data, self._y_data)
 
         # Build results table.
