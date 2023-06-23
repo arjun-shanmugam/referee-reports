@@ -179,7 +179,7 @@ class RefereeReportDataset:
 
         # Validate model types.
         for model_name in requested_models:
-            if self.models[model_name]._model_type() != "OLS":
+            if self.models[model_name]._model_type != "OLS":
                 raise TypeError("This function may only be used to produce output for OLS models.")
 
         # Grab results tables.
@@ -235,7 +235,7 @@ class RefereeReportDataset:
             raise ValueError("A model by that name has not been estimated.")
 
         # Validate model types.
-        if self.models[model_name]._model_type() != "Regularized":
+        if self.models[model_name]._model_type != "Regularized":
             raise TypeError("This function may only be used to produce output for regularized regression models.")
 
         # Get results.
