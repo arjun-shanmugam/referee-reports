@@ -93,7 +93,6 @@ class OLSRegression(Regression):
 
 
 def get_optimal_parameters(cv_results: pd.DataFrame, penalty: str, N: int, cv_folds: int):
-
     if penalty == 'elasticnet':
         top_parameters_index = cv_results.sort_values(['param_C', 'param_l1_ratio'], ascending=[True, False])['mean_test_neg_log_loss'].idxmax()
     else:
@@ -163,8 +162,8 @@ class RegularizedRegression(Regression):
             seed: int,
             alphas: np.ndarray,
             adjust_alpha: bool,
-            n_jobs: int=1,
-            l1_ratios: np.ndarray = None):
+            l1_ratios: np.ndarray = None,
+            n_jobs: int = 1):
 
         # Error check penalty argument.
         if penalty not in ['l1', 'l2', 'elasticnet']:

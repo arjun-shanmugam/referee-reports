@@ -55,8 +55,6 @@ class RefereeReportDataset:
         self.models = {}
         np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
 
-
-
     def build_df(self, text_representation: str, ngrams: int, restrict_to_papers_with_mixed_gender_referees: bool, balance_sample_by_gender: bool):
 
         self._format_non_vocabulary_columns()
@@ -214,7 +212,8 @@ class RefereeReportDataset:
                             cv_folds: int,
                             alphas: np.ndarray,
                             adjust_alpha: bool,
-                            l1_ratios: np.ndarray = None
+                            l1_ratios: np.ndarray = None,
+                            n_jobs: int = 1,
                             ):
         # Check that specified independent, dependent variables are valid.
         self._validate_columns(y, X)
@@ -227,7 +226,7 @@ class RefereeReportDataset:
         self.models[model_name] = RegularizedRegression(model_name, dependent_variable, independent_variables, add_constant, log_transform, standardize)
 
         # Run the regression
-        self.models[model_name].fit(penalty, logistic, stratify, cv_folds, self._seed, alphas, adjust_alpha, l1_ratios)
+        self.models[model_name].fit(penalty, logistic, stratify, cv_folds, self._seed, alphas, adjust_alpha, l1_ratios, n_jobs)
 
     def build_regularized_results_table(self, model_name, num_coefs_to_report=40):
         # Validate model names.
@@ -313,7 +312,7 @@ class RefereeReportDataset:
         # Plot distribution of report lengths, separately by gender.
         fig, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
         for gender, title, ax, color in zip([1, 0], ["Written by Female Referee", "Written by Non-female Referee"], [ax1, ax2], [Colors.P1,
-                                            Colors.P2]):
+                                                                                                                                 Colors.P2]):
             report_lengths = self._df.loc[self._df['_female_'] == gender, self._reports_vocabulary].sum(axis=1)
             plot_histogram(ax, x=report_lengths, title=title, xlabel="Length", color=color)
         save_figure_and_close(fig, os.path.join(self._output_directory, "histogram_report_lengths_by_gender.png"))
@@ -362,6 +361,7 @@ class RefereeReportDataset:
 
     def get_reports_vocabulary(self):
         return self._reports_vocabulary
+
     # TODO: RESUME HERE
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
