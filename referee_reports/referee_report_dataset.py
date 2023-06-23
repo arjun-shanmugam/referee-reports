@@ -245,7 +245,7 @@ class RefereeReportDataset:
                 f"{num_coefs_to_report * 2} coefficients were requested, but the requested model only contains {len(coefficients_sorted)} variables.")
 
         # Format final parameters column.
-        final_parameters = final_parameters.reset_index()['index'] + ": " + final_parameters.round(3).astype(str)
+        final_parameters = final_parameters.reset_index()['index'].str.cat(final_parameters.round(3).fillna("--").astype(str).values, sep=" ")
 
         # Get largest nonzero coefficients; concatenate them with the associated token.
         top_coefficients = coefficients_sorted.iloc[:num_coefs_to_report]
