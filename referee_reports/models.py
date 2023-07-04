@@ -95,9 +95,10 @@ class OLSRegression(Regression):
 def get_optimal_parameters(cv_results: pd.DataFrame, penalty: str, N: int, cv_folds: int):
     if penalty == 'elasticnet':
         top_parameters_index = cv_results.sort_values(['param_C', 'param_l1_ratio'], ascending=[True, False])['mean_test_neg_log_loss'].idxmax()
-        print(cv_results.loc[top_parameters_index, 'param_C'])
+
     else:
         top_parameters_index = cv_results.sort_values('param_C', ascending=True)['mean_test_neg_log_loss'].idxmax()
+
 
     top_mean_test_loss = cv_results.loc[top_parameters_index, 'mean_test_neg_log_loss']
     top_se_test_loss = cv_results.loc[top_parameters_index, 'std_test_neg_log_loss'] / np.sqrt(cv_folds)
@@ -203,7 +204,13 @@ class RegularizedRegression(Regression):
         # DataFrame where parameters form the index and mean(loss), se(loss) form the columns.
         regularization_path = pd.DataFrame(cv_results_df[['mean_test_neg_log_loss', 'std_test_neg_log_loss']])
         regularization_path.columns = ['mean_loss', 'std_loss']
-        regularization_path.index = [tuple(dictionary.values()) for dictionary in grid_search_result.cv_results_['params']]
+        alphas = 1 / (cv_results_df['param_C'] * N) if penalty == 'l1' else 1 / cv_results_df['param_C']
+        if penalty == 'elasticnet':
+            l1s = cv_results_df['param_l1_ratio']
+        cols = [alphas, l1s] if penalty == 'elasticnet' else [alphas]
+        params = pd.concat(cols, axis=1).to_dict('records')
+
+        regularization_path.index = [tuple(dictionary.values()) for dictionary in params]
 
         # Get final parameters.
         N = len(self._X_data)

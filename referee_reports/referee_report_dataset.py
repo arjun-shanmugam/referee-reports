@@ -43,11 +43,11 @@ class RefereeReportDataset:
             seed (int): _description_
         """
         # noinspection PyTypeChecker
-        self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
-                                       index_col=['paper', 'num'])
+        self._reports_df = pd.DataFrame()  # pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
+        # index_col=['paper', 'num'])
         # # # noinspection PyTypeChecker
-        self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
-                                      index_col='paper')
+        self._papers_df = pd.DataFrame()  # pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
+        # index_col='paper')
         self._output_directory = output_directory
         self._seed = seed
         self._df = pd.DataFrame(index=self._reports_df.index)
@@ -247,10 +247,14 @@ class RefereeReportDataset:
         else:
             xlabel = "Parameters $\\alpha, w^{L1})$ Used to Fit Model"
 
-        regularization_path_index_reversed = regularization_path.index.tolist()
-        regularization_path_index_reversed.reverse()
+        if np.isnan(final_parameters["$w^{L1}^*$"]):
+            x = np.array([label[0] for label in regularization_path.index])
+        else:
+            x = np.array(range(0, len(regularization_path.index)))
+            # TODO: add labels in elasticnet case
+
         plot_scatter_with_shaded_errors(ax,
-                                        x=np.array([round(label[0], 2) for label in regularization_path_index_reversed]),
+                                        x=x,
                                         y=regularization_path['mean_loss'].values,
                                         yerr=regularization_path['std_loss'].values / np.sqrt(final_parameters["C.V. folds: "]),
                                         xlabel=xlabel,
