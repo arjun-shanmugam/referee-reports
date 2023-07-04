@@ -249,12 +249,10 @@ class RefereeReportDataset:
 
         regularization_path_index_reversed = regularization_path.index.tolist()
         regularization_path_index_reversed.reverse()
-        xticklabels = [f"{label[0]:.2f}" if len(label) == 1 else f"{label[0]: .2f}{label[1]: .2f}" for label in regularization_path_index_reversed]
         plot_scatter_with_shaded_errors(ax,
-                                        x=np.array(range(len(regularization_path.index))),
+                                        x=np.array([round(label[0], 2) for label in regularization_path_index_reversed]),
                                         y=regularization_path['mean_loss'].values,
                                         yerr=regularization_path['std_loss'].values / np.sqrt(final_parameters["C.V. folds: "]),
-                                        xticklabels=xticklabels,
                                         xlabel=xlabel,
                                         ylabel=f"Mean Negative Log Loss Across {final_parameters['C.V. folds: ']} C.V. Folds")
         plot_labeled_vline(ax, x=final_parameters["$\\alpha^{*}$: "], text="$\\alpha^{*}=" + str(round(final_parameters["$\\alpha^{*}$: "], 3)) + "$")
