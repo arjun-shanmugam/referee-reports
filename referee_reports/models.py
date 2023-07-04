@@ -200,10 +200,9 @@ class RegularizedRegression(Regression):
         coefficients_sorted = pd.Series(grid_search_result.best_estimator_.coef_.tolist()[0], index=self._X_data.columns).sort_values()
 
         # DataFrame where parameters form the index and mean(loss), se(loss) form the columns.
-        regularization_path_index = [tuple(dictionary.values()) for dictionary in grid_search_result.cv_results_['params']]
-        regularization_path = pd.DataFrame(cv_results_df[['mean_test_neg_log_loss', 'std_test_neg_log_loss']],
-                                           index=regularization_path_index,
-                                           columns=['mean_loss', 'std_loss'])
+        regularization_path = pd.DataFrame(cv_results_df[['mean_test_neg_log_loss', 'std_test_neg_log_loss']])
+        regularization_path.columns = ['mean_loss', 'std_loss']
+        regularization_path.index = [tuple(dictionary.values()) for dictionary in grid_search_result.cv_results_['params']]
 
         # Get final parameters.
         N = len(self._X_data)
@@ -223,7 +222,8 @@ class RegularizedRegression(Regression):
                                  "$SE_{\\alpha^{*}_{adjusted}}$: ",
                                  "$w_{adjusted}^{L1}^*$",
                                  "Binary cross-entropy on final refit: ",
-                                 "Accuracy on final refit: "]
+                                 "Accuracy on final refit: ",
+                                 "C.V. folds: "]
         final_parameter_values = [N,
                                   portion_of_coefficients_0,
                                   alpha_star,
@@ -235,7 +235,8 @@ class RegularizedRegression(Regression):
                                   top_adjusted_se_test_loss,
                                   w_l1_star_adjusted,
                                   loss_after_final_refit,
-                                  accuracy_after_final_refit]
+                                  accuracy_after_final_refit,
+                                  cv_folds]
         final_parameters = pd.Series(final_parameter_values, index=final_parameter_names)
 
         self._results_table = (coefficients_sorted, regularization_path, final_parameters)

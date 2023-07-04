@@ -15,7 +15,7 @@ from referee_reports.pkldir.decode import decode
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from referee_reports.figure_utilities import plot_histogram, save_figure_and_close
+from referee_reports.figure_utilities import plot_histogram, plot_scatter_with_shaded_errors, save_figure_and_close
 
 from referee_reports.models import OLSRegression, RegularizedRegression
 
@@ -42,12 +42,14 @@ class RefereeReportDataset:
             output_directory (str): _description_
             seed (int): _description_
         """
+        self._reports_df = pd.DataFrame()
+        self._papers_df = pd.DataFrame()
         # noinspection PyTypeChecker
-        self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
-                                       index_col=['paper', 'num'])
-        # noinspection PyTypeChecker
-        self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
-                                      index_col='paper')
+        # self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
+        #                                index_col=['paper', 'num'])
+        # # noinspection PyTypeChecker
+        # self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
+        #                               index_col='paper')
         self._output_directory = output_directory
         self._seed = seed
         self._df = pd.DataFrame(index=self._reports_df.index)
@@ -228,6 +230,36 @@ class RefereeReportDataset:
         # Run the regression
         self.models[model_name].fit(penalty, logistic, stratify, cv_folds, self._seed, alphas, adjust_alpha, l1_ratios, n_jobs)
 
+    def plot_regularization_path(self, model_name):
+        # Validate model names.
+        if model_name not in self.models:
+            raise ValueError("A model by that name has not been estimated.")
+
+        # Validate model types.
+        if self.models[model_name]._model_type != "Regularized":
+            raise TypeError("This function may only be used to produce output for regularized regression models.")
+
+        # Get results.
+        coefficients_sorted, regularization_path, final_parameters = self.models[model_name]._results_table
+
+        # Plot.
+        fig, ax = plt.subplots()
+        if np.isnan(final_parameters["$w_{adjusted}^{L1}^*$"]):
+            xlabel = "Parameter $\\alpha$ Used to Fit Model"
+        else:
+            xlabel = "Parameters $\\alpha, w^{L1})$ Used to Fit Model"
+
+        # TODO: Remove parentheses from xlabels; round xlabels; ensure that shaded errors are appearing properly
+        xticklabels = [str(round(label[0], 2)) if len(label) == 1 else str(round(label[0], 2)) + str(round(label[1], 2)) for label in regularization_path.index]
+        plot_scatter_with_shaded_errors(ax,
+                                        x=np.array(range(len(regularization_path.index))),
+                                        y=regularization_path['mean_loss'].values,
+                                        xticklabels=xticklabels,
+                                        yerr=regularization_path['std_loss'].values / np.sqrt(final_parameters["C.V. folds: "]),
+                                        xlabel=xlabel,
+                                        ylabel=f"Mean Negative Log Loss Across {final_parameters['C.V. folds: ']} C.V. Folds")
+        save_figure_and_close(fig, os.path.join(self._output_directory, model_name + "_regularization_path.png"), bbox_inches='tight')
+
     def build_regularized_results_table(self, model_name, num_coefs_to_report=40):
         # Validate model names.
         if model_name not in self.models:
@@ -267,6 +299,8 @@ class RefereeReportDataset:
                                index=False,
                                escape=False,
                                float_format="%.3f")
+
+        # Plot path of alphas.
 
     # TODO: RESUME HERE
     def produce_summary_statistics(self):

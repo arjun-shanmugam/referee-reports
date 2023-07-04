@@ -2,6 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt, transforms
 from matplotlib.axes import Axes
 import referee_reports.constants
+
+
 def save_figure_and_close(figure: plt.Figure,
                           filename: str,
                           bbox_inches: str = 'tight'):
@@ -13,6 +15,8 @@ def save_figure_and_close(figure: plt.Figure,
     """
     figure.savefig(filename, bbox_inches=bbox_inches)
     plt.close(figure)
+
+
 def plot_labeled_vline(ax: Axes,
                        x: float,
                        text: str,
@@ -130,3 +134,32 @@ def plot_histogram(ax: Axes,
                            text=label,
                            color=summary_statistics_linecolor,
                            text_y_location_normalized=summary_statistics_text_y_location_normalized)
+
+
+def plot_scatter_with_shaded_errors(ax,
+                                    x: np.ndarray,
+                                    y: np.ndarray,
+                                    yerr: np.ndarray,
+                                    xlabel: str,
+                                    ylabel: str,
+                                    title: str = "",
+                                    xticklabels=None,
+                                    point_color: str = referee_reports.constants.Colors.P3,
+                                    point_size: float = 2,
+                                    error_shading_color: str = referee_reports.constants.Colors.P1,
+                                    error_shading_opacity: float = 0.5,
+                                    zorder=None):
+    if zorder is None:
+        ax.scatter(x, y, color=point_color, marker='o', s=point_size)
+    else:
+        ax.scatter(x, y, color=point_color, marker='o', s=point_size, zorder=zorder)
+
+
+    ax.fill_between(x, y - yerr, y + yerr, color=error_shading_color, alpha=error_shading_opacity)
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
+    if xticklabels is not None:
+        ax.set_xticklabels(xticklabels)
