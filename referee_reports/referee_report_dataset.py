@@ -266,7 +266,7 @@ class RefereeReportDataset:
                                text="$\\alpha^{*}_{adjusted}=" + str(round(final_parameters["$\\alpha^{*}_{adjusted}$: "], 3)) + "$")
             plot_labeled_hline(ax,
                                y=final_parameters["$\\bar{p}_{\\alpha^*}$: "] + final_parameters["$SE_{\\alpha^*}$: "],
-                               text="$\\bar{p}_{\\alpha^*} - SE_{\\alpha^*}$")
+                               text="$\\bar{p}_{\\alpha^*} + SE_{\\alpha^*}$")
 
         save_figure_and_close(fig, os.path.join(self._output_directory, model_name + "_regularization_path.png"), bbox_inches='tight')
 
@@ -312,7 +312,6 @@ class RefereeReportDataset:
 
         # Plot path of alphas.
 
-    # TODO: RESUME HERE
     def produce_summary_statistics(self):
         # Plot number of referees on each paper of each gender.
         def tally_referee_genders(referee_genders_for_single_paper: pd.DataFrame):
