@@ -265,7 +265,7 @@ class RefereeReportDataset:
                                x=final_parameters["$\\alpha^{*}_{adjusted}$: "],
                                text="$\\alpha^{*}_{adjusted}=" + str(round(final_parameters["$\\alpha^{*}_{adjusted}$: "], 3)) + "$")
             plot_labeled_hline(ax,
-                               y=final_parameters["$\\bar{p}_{\\alpha^*}$: "] - final_parameters["$SE_{\\alpha^*}$: "],
+                               y=final_parameters["$\\bar{p}_{\\alpha^*}$: "] + final_parameters["$SE_{\\alpha^*}$: "],
                                text="$\\bar{p}_{\\alpha^*} - SE_{\\alpha^*}$")
 
         save_figure_and_close(fig, os.path.join(self._output_directory, model_name + "_regularization_path.png"), bbox_inches='tight')

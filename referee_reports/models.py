@@ -141,8 +141,8 @@ def get_optimal_parameters(cv_results: pd.DataFrame, penalty: str, N: int, cv_fo
             top_adjusted_mean_test_loss = cv_results.loc[top_adjusted_parameters_index, 'mean_test_neg_log_loss']
             top_adjusted_se_test_loss = cv_results.loc[top_adjusted_parameters_index, 'std_test_neg_log_loss'] / np.sqrt(cv_folds)
 
-    return (top_parameters_index, top_adjusted_parameters_index, alpha_star, top_mean_test_loss, top_se_test_loss,
-            w_l1_star, alpha_star_adjusted, top_adjusted_mean_test_loss, top_adjusted_se_test_loss, w_l1_star_adjusted)
+    return (top_parameters_index, top_adjusted_parameters_index, alpha_star, -1 * top_mean_test_loss, top_se_test_loss,
+            w_l1_star, alpha_star_adjusted, -1 * top_adjusted_mean_test_loss, top_adjusted_se_test_loss, w_l1_star_adjusted)
 
 
 def custom_refit(cv_results, adjust_alpha_value: bool, penalty: str, N: int, cv_folds: int):
@@ -202,7 +202,7 @@ class RegularizedRegression(Regression):
         coefficients_sorted = pd.Series(grid_search_result.best_estimator_.coef_.tolist()[0], index=self._X_data.columns).sort_values(ascending=False)
 
         # DataFrame where parameters form the index and mean(loss), se(loss) form the columns.
-        regularization_path = pd.DataFrame(cv_results_df[['mean_test_neg_log_loss', 'std_test_neg_log_loss']])
+        regularization_path = pd.DataFrame(cv_results_df[['mean_test_neg_log_loss', 'std_test_neg_log_loss']]) * -1
         regularization_path.columns = ['mean_loss', 'std_loss']
         alphas = 1 / (cv_results_df['param_C'] * N) if penalty == 'l1' else 1 / cv_results_df['param_C']
         if penalty == 'elasticnet':
