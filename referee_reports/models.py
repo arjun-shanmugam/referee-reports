@@ -199,7 +199,7 @@ class RegularizedRegression(Regression):
         # Build results table.
         cv_results_df = pd.DataFrame(grid_search_result.cv_results_)
         # Sorted list of coefficients.
-        coefficients_sorted = pd.Series(grid_search_result.best_estimator_.coef_.tolist()[0], index=self._X_data.columns).sort_values()
+        coefficients_sorted = pd.Series(grid_search_result.best_estimator_.coef_.tolist()[0], index=self._X_data.columns).sort_values(ascending=False)
 
         # DataFrame where parameters form the index and mean(loss), se(loss) form the columns.
         regularization_path = pd.DataFrame(cv_results_df[['mean_test_neg_log_loss', 'std_test_neg_log_loss']])

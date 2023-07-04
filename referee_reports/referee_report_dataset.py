@@ -44,14 +44,14 @@ class RefereeReportDataset:
         """
         # noinspection PyTypeChecker
         self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')), index_col=['paper', 'num'])
-        # # # noinspection PyTypeChecker
+        # noinspection PyTypeChecker
         self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')), index_col='paper')
         self._output_directory = output_directory
         self._seed = seed
         self._df = pd.DataFrame(index=self._reports_df.index)
         self._reports_vocabulary = np.empty(1)
         self.models = {}
-        np.random.seed(self._seed)  # Bad practice, but must set internal _seed to ensure reproducible output from sklearn.
+        np.random.seed(self._seed)  # Bad practice, but must set internal seed to ensure reproducible output from sklearn.
 
     def build_df(self, text_representation: str, ngrams: int, restrict_to_papers_with_mixed_gender_referees: bool, balance_sample_by_gender: bool):
 
