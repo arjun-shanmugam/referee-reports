@@ -15,7 +15,7 @@ from referee_reports.pkldir.decode import decode
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from referee_reports.figure_utilities import plot_histogram, plot_scatter_with_shaded_errors, save_figure_and_close
+from referee_reports.figure_utilities import plot_histogram, plot_labeled_hline, plot_labeled_vline, plot_scatter_with_shaded_errors, save_figure_and_close
 
 from referee_reports.models import OLSRegression, RegularizedRegression
 
@@ -42,12 +42,14 @@ class RefereeReportDataset:
             output_directory (str): _description_
             seed (int): _description_
         """
+        self._reports_df = pd.DataFrame()
+        self._papers_df = pd.DataFrame()
         # noinspection PyTypeChecker
-        self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
-                                       index_col=['paper', 'num'])
-        # # noinspection PyTypeChecker
-        self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
-                                      index_col='paper')
+        # self._reports_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_reports_file).decode('utf-8')),
+        #                                index_col=['paper', 'num'])
+        # # # noinspection PyTypeChecker
+        # self._papers_df = pd.read_csv(io.StringIO(decode(cleaned_pickled_papers_file).decode('utf-8')),
+        #                               index_col='paper')
         self._output_directory = output_directory
         self._seed = seed
         self._df = pd.DataFrame(index=self._reports_df.index)
@@ -228,7 +230,7 @@ class RefereeReportDataset:
         # Run the regression
         self.models[model_name].fit(penalty, logistic, stratify, cv_folds, self._seed, alphas, adjust_alpha, l1_ratios, n_jobs)
 
-    def plot_regularization_path(self, model_name):
+    def plot_regularization_path(self, model_name: str, display_adjusted_alpha: bool):
         # Validate model names.
         if model_name not in self.models:
             raise ValueError("A model by that name has not been estimated.")
@@ -247,15 +249,27 @@ class RefereeReportDataset:
         else:
             xlabel = "Parameters $\\alpha, w^{L1})$ Used to Fit Model"
 
-        # TODO: Remove parentheses from xlabels; round xlabels; ensure that shaded errors are appearing properly
-        xticklabels = [str(round(label[0], 2)) if len(label) == 1 else str(round(label[0], 2)) + str(round(label[1], 2)) for label in regularization_path.index]
+        regularization_path_index_reversed = regularization_path.index.tolist()
+        regularization_path_index_reversed.reverse()
+        xticklabels = [f"{label[0]:.2f}" if len(label) == 1 else f"{label[0]: .2f}{label[1]: .2f}" for label in regularization_path_index_reversed]
         plot_scatter_with_shaded_errors(ax,
                                         x=np.array(range(len(regularization_path.index))),
                                         y=regularization_path['mean_loss'].values,
-                                        xticklabels=xticklabels,
                                         yerr=regularization_path['std_loss'].values / np.sqrt(final_parameters["C.V. folds: "]),
+                                        xticklabels=xticklabels,
                                         xlabel=xlabel,
                                         ylabel=f"Mean Negative Log Loss Across {final_parameters['C.V. folds: ']} C.V. Folds")
+        plot_labeled_vline(ax, x=final_parameters["$\\alpha^{*}$: "], text="$\\alpha^{*}=" + str(round(final_parameters["$\\alpha^{*}$: "], 3)) + "$")
+        ax.scatter(x=final_parameters["$\\alpha^{*}$: "], y=final_parameters["$\\bar{p}_{\\alpha^*}$: "], s=50, c=Colors.P3, zorder=10)
+
+        if display_adjusted_alpha:
+            plot_labeled_vline(ax,
+                               x=final_parameters["$\\alpha^{*}_{adjusted}$: "],
+                               text="$\\alpha^{*}_{adjusted}=" + str(round(final_parameters["$\\alpha^{*}_{adjusted}$: "], 3)) + "$")
+            plot_labeled_hline(ax,
+                               y=final_parameters["$\\bar{p}_{\\alpha^*}$: "] - final_parameters["$SE_{\\alpha^*}$: "],
+                               text="$\\bar{p}_{\\alpha^*} - SE_{\\alpha^*}$")
+
         save_figure_and_close(fig, os.path.join(self._output_directory, model_name + "_regularization_path.png"), bbox_inches='tight')
 
     def build_regularized_results_table(self, model_name, num_coefs_to_report=40):

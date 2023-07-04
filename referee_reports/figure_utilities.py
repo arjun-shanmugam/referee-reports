@@ -60,6 +60,32 @@ def plot_labeled_vline(ax: Axes,
             zorder=zorder)
 
 
+def plot_labeled_hline(ax,
+                       y: float,
+                       text: str,
+                       color: str = referee_reports.constants.Colors.P10,
+                       linestyle: str = '--',
+                       text_x_location_normalized: float = .85,
+                       text_size: str = 'small'):
+    # Plot horizontal line.
+    ax.axhline(y=y, c=color, linestyle=linestyle)
+
+    # Create blended transform.
+    trans = transforms.blended_transform_factory(ax.transAxes,  # We want x to be in axes coordinates (between 0 and 1).
+                                                 ax.transData)  # We want y to be in data coordinates.
+
+    ax.text(x=text_x_location_normalized,
+            y=y,
+            s=text,
+            color=color,
+            size=text_size,
+            horizontalalignment='center',
+            bbox=dict(facecolor='white', lw=1, ec='black'),
+            verticalalignment='center',
+            transform=trans,
+            zorder=10)
+
+
 def plot_histogram(ax: Axes,
                    x: np.ndarray,
                    xlabel: str,
@@ -154,7 +180,6 @@ def plot_scatter_with_shaded_errors(ax,
     else:
         ax.scatter(x, y, color=point_color, marker='o', s=point_size, zorder=zorder)
 
-
     ax.fill_between(x, y - yerr, y + yerr, color=error_shading_color, alpha=error_shading_opacity)
 
     ax.set_xlabel(xlabel)
@@ -162,4 +187,8 @@ def plot_scatter_with_shaded_errors(ax,
     ax.set_title(title)
 
     if xticklabels is not None:
-        ax.set_xticklabels(xticklabels)
+        tick_indices = list(range(0, len(x), 10))
+        xticks = [tick for i, tick in enumerate(x) if i in tick_indices]
+        xticklabels_subset = [xtick for i, xtick in enumerate(xticklabels) if i in tick_indices]
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels_subset)
