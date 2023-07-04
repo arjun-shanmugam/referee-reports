@@ -243,19 +243,21 @@ class RefereeReportDataset:
         if np.isnan(final_parameters["$w_{adjusted}^{L1}^*$"]):
             xlabel = "Parameter $\\alpha$ Used to Fit Model"
         else:
-            xlabel = "Parameters $\\alpha, w^{L1})$ Used to Fit Model"
+            xlabel = "Parameters $(\\alpha, w^{L1})$ Used to Fit Model"
 
         if np.isnan(final_parameters["$w^{L1}^*$"]):
             x = np.array([label[0] for label in regularization_path.index])
+            xticklabels = None
         else:
             x = np.array(range(0, len(regularization_path.index)))
-            # TODO: add labels in elasticnet case
+            xticklabels = [str(round(label[0], 2)) + ", " + str(round(label[1], 2)) for label in regularization_path.index]
 
         plot_scatter_with_shaded_errors(ax,
                                         x=x,
                                         y=regularization_path['mean_loss'].values,
                                         yerr=regularization_path['std_loss'].values / np.sqrt(final_parameters["C.V. folds: "]),
                                         xlabel=xlabel,
+                                        xticklabels=xticklabels,
                                         ylabel=f"Mean Negative Log Loss Across {final_parameters['C.V. folds: ']} C.V. Folds")
         plot_labeled_vline(ax, x=final_parameters["$\\alpha^{*}$: "], text="$\\alpha^{*}=" + str(round(final_parameters["$\\alpha^{*}$: "], 3)) + "$")
         ax.scatter(x=final_parameters["$\\alpha^{*}$: "], y=final_parameters["$\\bar{p}_{\\alpha^*}$: "], s=50, c=Colors.P3, zorder=10)
