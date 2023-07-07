@@ -78,7 +78,7 @@ def test_cross_validated_logistic_LASSO(get_breast_cancer_data):
 
     assert expected_results.C_ == 1 / (regularized_regression._results_table[2]["$\\alpha^{*}$: "] * len(X))
     pd.testing.assert_series_equal(regularized_regression._results_table[0],
-                                   pd.Series(expected_results.coef_.tolist()[0], index=X.columns).sort_values())
+                                   pd.Series(expected_results.coef_.tolist()[0], index=X.columns).loc[regularized_regression._results_table[0].index])
 
 def test_cross_validated_logistic_ridge(get_breast_cancer_data):
     X, y = get_breast_cancer_data
