@@ -408,10 +408,13 @@ class RefereeReportDataset:
         return self._reports_vocabulary
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
+
+        # TODO: Update likelihood ratio class
+        # To cater to old codebase, we have to pass in the DTM in a slightly altered form:
         dtm = self._df[self._reports_vocabulary].copy()
         dtm.index.names = ["_paper_", "_num_"]
-
-        self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self._reports_vocabulary].reset_index(),
+        dtm = dtm.reset_index()
+        self.models[model_name] = LikelihoodRatioModel(dtm=dtm,
                                                        document_classification_variable=self._df['_female_'],
                                                        fe_variable=self._df['_paper_'],
                                                        model_type=model_type)
