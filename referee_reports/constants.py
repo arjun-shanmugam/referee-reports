@@ -1,3 +1,7 @@
+"""
+Author: Arjun Shanmugam
+Referee Bias Project
+"""
 class NLPConstants:
     NLTK_STOPWORDS_ENGLISH = {'her', 'for', 'that', 'an', 'here', 'nor', 'same', 'mustn', 'wouldn', 'again', 'our',
                               'your', "hasn't", 'down', 'his', 'had', 'too', "didn't", "haven't", 'then', 'yours',

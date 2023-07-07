@@ -1,4 +1,6 @@
 """Defines the Regression class, which implements functionality that is common to OLSRegression, Regularized Regression, and PanelRegression.
+
+Author: Arjun Shanmugam
 """
 from typing import List
 

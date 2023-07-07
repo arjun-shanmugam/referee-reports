@@ -1,3 +1,5 @@
+
+
 import numpy as np
 import pytest
 from sklearn.linear_model import LogisticRegressionCV
@@ -106,10 +108,8 @@ def test_cross_validated_logistic_ridge(get_breast_cancer_data):
                                             scoring='neg_log_loss').fit(X, y)
 
     assert expected_results.C_ == 1 / regularized_regression._results_table[2]["$\\alpha^{*}$: "]
-    print(regularized_regression._results_table[0])
-    print(pd.Series(expected_results.coef_.tolist()[0], index=X.columns))
-    pd.testing.assert_series_equal(regularized_regression._results_table[0].loc[::-1],
-                                   pd.Series(expected_results.coef_.tolist()[0], index=X.columns))
+    pd.testing.assert_series_equal(regularized_regression._results_table[0],
+                                   pd.Series(expected_results.coef_.tolist()[0], index=X.columns).iloc[::-1])
 
 # TODO: Figure out why SKLearn results are slightly different from mine...
 """def test_cross_validated_logistic_elasticnet(get_breast_cancer_data):

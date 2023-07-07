@@ -2,6 +2,8 @@
 document_readers.py
 
 Defines useful classes for reading and processing raw documents.
+
+Author: Arjun Shanmugam
 """
 import os
 import pickle
