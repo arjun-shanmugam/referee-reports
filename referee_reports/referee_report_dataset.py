@@ -17,7 +17,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from referee_reports.figure_utilities import plot_histogram, plot_labeled_hline, plot_labeled_vline, plot_scatter_with_shaded_errors, save_figure_and_close
 
-from referee_reports.models import OLSRegression, RegularizedRegression
+from referee_reports.models import LikelihoodRatioModel, OLSRegression, RegularizedRegression
 
 
 class RefereeReportDataset:
@@ -479,47 +479,6 @@ class RefereeReportDataset:
                                                                  ": " +
                                                                  lowest_fe_ratios["fe_ratios"].astype(str)
                                                                  )
-
-        # Plot likelihood ratios by the frequency of the associated tokens.
-        extreme_pooled_ratios = pd.concat([highest_pooled_ratios['pooled_ratios'],
-                                           lowest_pooled_ratios['pooled_ratios']],
-                                          axis=0)
-        extreme_fe_ratios = pd.concat([highest_fe_ratios['fe_ratios'],
-                                       lowest_fe_ratios['fe_ratios']],
-                                      axis=0)
-        pooled_ratios_frequencies = pd.concat([highest_pooled_ratios['frequency_over_documents'],
-                                               lowest_pooled_ratios['frequency_over_documents']],
-                                              axis=0)
-        fe_ratios_frequencies = pd.concat([highest_fe_ratios['frequency_over_documents'],
-                                           lowest_fe_ratios['frequency_over_documents']],
-                                          axis=0)
-        fig, axs = plt.subplots(2, 1, sharex='col')
-        y_list = [extreme_pooled_ratios,
-                  extreme_fe_ratios]
-        x_list = [pooled_ratios_frequencies,
-                  fe_ratios_frequencies]
-        xlabels = ["",
-                   """Portion of Documents in Which Token Appears
-
-                   This figure plots likelihood ratios by the frequency of the associated tokens across paper groups, separately for
-                   the most extreme pooled sample and within-paper likelihood ratios. A \'paper group\' is defined as a group of
-                   reports associated with a single paper. To produce this figure, pooled sample and within-paper likelihood ratios 
-                   are first calculated for every token. These likelihood ratios become the _y_data-values of the points displayed in this graph.
-                   Then, for each of the most extreme likelihood ratios, I calculate the portion of paper groups in which the associated
-                   token appears at least once. Those values form the x-values of the points displayed in this graph. Note that both
-                   plots share the same x-axis. 
-                   """]
-        ylabels = ["Likelihood Ratio", "Likelihood Ratio"]
-        titles = ["Most Extreme Pooled Sample Likelihood Ratios by Frequency of Associated Tokens",
-                  "Most Extreme Within-Paper Likelihood Ratios by Frequency of Associated Tokens"]
-        colors = [OI_constants.p1.value, OI_constants.p3.value]
-        for ax, x, y, xlabel, ylabel, title, color in zip(axs, x_list, y_list, xlabels, ylabels, titles, colors):
-            ax.scatter(x, y, c=color, s=2)
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
-            ax.set_title(title)
-        plt.savefig(os.path.join(self.path_to_output, 'scatter_ratios_by_frequency_' + str(self.ngrams) + '_grams.png'),
-                    bbox_inches='tight')
 
         # Produce final results table.
         highest_df = (pd.concat([highest_pooled_ratios['Highest Pooled Ratios'],
