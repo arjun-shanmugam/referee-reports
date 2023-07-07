@@ -408,6 +408,9 @@ class RefereeReportDataset:
         return self._reports_vocabulary
 
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
+        dtm = self._df[self._reports_vocabulary].copy()
+        dtm.index.names = ["_paper_", "_num_"]
+
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self._reports_vocabulary].reset_index(),
                                                        document_classification_variable=self._df['_female_'],
                                                        fe_variable=self._df['_paper_'],
