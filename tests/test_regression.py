@@ -108,7 +108,7 @@ def test_cross_validated_logistic_ridge(get_breast_cancer_data):
     assert expected_results.C_ == 1 / regularized_regression._results_table[2]["$\\alpha^{*}$: "]
     print(regularized_regression._results_table[0])
     print(pd.Series(expected_results.coef_.tolist()[0], index=X.columns))
-    pd.testing.assert_series_equal(regularized_regression._results_table[0],
+    pd.testing.assert_series_equal(regularized_regression._results_table[0].loc[::-1],
                                    pd.Series(expected_results.coef_.tolist()[0], index=X.columns))
 
 # TODO: Figure out why SKLearn results are slightly different from mine...

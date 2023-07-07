@@ -407,7 +407,6 @@ class RefereeReportDataset:
     def get_reports_vocabulary(self):
         return self._reports_vocabulary
 
-    # TODO: RESUME HERE
     def calculate_likelihood_ratios(self, model_name: str, model_type: str):
         self.models[model_name] = LikelihoodRatioModel(dtm=self._df[self.report_vocabulary],
                                                        document_classification_variable=self._df['_female_'],
@@ -496,4 +495,4 @@ class RefereeReportDataset:
         metrics = results_table['Metrics'].reset_index(drop=True).loc[:3]
         results = pd.concat([lowest_df, highest_df, metrics], axis=1)
         results.columns = ["\textbf{" + column + "}" for column in results.columns]
-        results.to_latex(os.path.join(self.path_to_output, model_name + "_ratio_results.tex"), index=False, escape=False)
+        results.to_latex(os.path.join(self._output_directory, model_name + "_ratio_results.tex"), index=False, escape=False)
