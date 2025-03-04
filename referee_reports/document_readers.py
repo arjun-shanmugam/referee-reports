@@ -16,6 +16,8 @@ from referee_reports.pkldir.decode import decode
 from referee_reports.pkldir.encode import encode
 from referee_reports.constants import NLPConstants
 from nltk.tokenize import sent_tokenize, word_tokenize
+import nltk
+nltk.download('punkt_tab')
 
 
 class JournalDocumentReader:
