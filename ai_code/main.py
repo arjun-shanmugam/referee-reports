@@ -59,12 +59,14 @@ if __name__ == '__main__':
     df = df.sample(frac=1, random_state = 3)
     df.reset_index(drop=True, inplace=True)
 
-    df_train = df.iloc[:10]
-    df_test = df.iloc[10:20]
+    df_train = df.iloc[:50]
+    df_test = df.iloc[50:100]
+    df_test = df_test.drop(["category"], axis = 1)
     print(f"train len: {len(df_train)}")
     print(f"test len: {len(df_test)}")
     print(df_train.columns)
-    print(df_train['id'][0:40])
+    print(df_test.columns)
+    print(df_train['id'][0:10])
     train_json = df_train.to_json(orient="records")
     test_json = df_test.to_json(orient="records")
 

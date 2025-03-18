@@ -1,0 +1,13 @@
+For each of these new documents, please guess whether they are from group A or group B *and* output your confidence from 0 to 1. Your output should take the following form:
+
+[
+    {
+        ID1: A (confidence_score_1)
+    },
+    {
+        ID2: B (confidence_score_2)
+    },
+    ...
+]
+
+As before, ID1 and ID2 refer to the document_id values of the given documents, A and B are the possible categories, and the confidence_scores in the parentheses should be decimals representing confidence of this prediction.

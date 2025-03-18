@@ -1,0 +1,7 @@
+Here is a list of documents, with associated group assignments. Note that
+the document IDs are randomly assigned. Your task is to learn to
+predict the group assignment (A or B) from the document text. You will
+be evaluated on another set of documents that I will pass to you. Do
+not give me any code or describe any other modeling mechanism: simply
+learn the relationship between text and group and wait for me to give
+you the testing set. Here is the training set:

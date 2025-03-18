@@ -1,0 +1,66 @@
+Provide up to six themes that help distinguish between groups A and B in the previously provided documents, based on their systematic differences. Each theme is one aspect of the text, such as a topic, sentiment, or characteristic. The themes should all be different (mutually exclusive), and also cover all the differences between groups A and B as well as possible (exhaustive with respect to differences). For each of the themes, create a scale to score each document. Specifically, these themes and scales could be of the following type:
+(a) Topics. Score each document on a scale from 0 to 3 by how much a topic appears in the document.
+(b) Language. Score a specific aspect of the style or tone on a scale from 0 to 3, such as how technical the language is or whether is uses a lot of metaphors.
+(c) Sentiment. Score a specific aspect of the sentiment expressed by the text from -1 to +1, such as how positive or negative it deals with a specific topic.
+If there are other types of themes or scales that are very fitting for the application, please also use those.
+
+Your output should take the same JSON form as in the following examples.
+First, your output should include a description of themes. Here is an example of themes that come from other data:
+
+```
+[
+    {
+        "theme_id": "TEC",
+        "theme_name": "Technical language",
+        "theme_description": "How technical the language is (from not technical to very technical)",
+        "theme_scale": [0, 1, 2, 3]
+    },
+    {
+        "theme_id": "APL",
+        "theme_name": "Focus on applicability",
+        "theme_description": "The degree to which the presented results can be applied in practice (from not at all to very well)",
+        "theme_scale": [0, 1, 2, 3]
+    },
+    {
+        "theme_id": "ANI",
+        "theme_name": "Animals",
+        "theme_description": "Emphasis on animals (from not at all to very much)",
+        "theme_scale": [0, 1, 2, 3]
+    },
+    {
+        "theme_id": "GSE",
+        "theme_name": "General sentiment",
+        "theme_description": "The general sentiment of the text (from negative to positive)",
+        "theme_scale": [-1, 0, 1]
+    },
+    {
+        "theme_id": "SRO",
+        "theme_name": "Sentiment about robots",
+        "theme_description": "The sentiment expressed about robots specifically  (from negative to positive)",
+        "theme_scale": [-1, 0, 1]
+    },
+    ,
+    {
+        "theme_id": "POE",
+        "theme_name": "Poetic form",
+        "theme_description": "The poetic form of the document (actual form)",
+        "theme_scale": ["Sonnet", "Haiku", "neither"]
+    }
+]
+```
+
+Second, a scoring of documents according to these themes:
+
+```
+[
+    {
+        ID1: TEC1,APL0,ANI3,GSE-1,SRO0,POEHaiku
+    },
+    {
+        ID2: ...
+    },
+    ...
+]
+```
+
+Note that "ID1" and "ID2" correspond to the document_id values of the above documents. The theme scores should be presented as they are above, with a comma-delimited list where each element comprises of the 3-letter theme_id followed by the score for the given document for that theme. Please score all of the documents.

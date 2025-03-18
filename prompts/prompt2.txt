@@ -1,0 +1,1 @@
+For each of the new documents below, for which I do not tell you whether they are in group A or B, please score these according to the themes as before. Your output should be of the same format as before. Here are the new documents:

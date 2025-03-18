@@ -1,0 +1,1 @@
+Here is the testing set. Please report only the document ID, the predicted group for each document, and your confidence score (between 0 and 1). Please score every document.

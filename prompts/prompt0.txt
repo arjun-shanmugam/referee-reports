@@ -1,0 +1,8 @@
+Below is a list of documents that belong to groups A and B. Look at all the
+documents, and describe the main systematic differences in themes
+between documents in groups A and B, in about ten sentences. These
+differences could concern topics, tone and style of language,
+sentiment, or any other major differences across groups.
+Here are the documents I want you to analyze, together with which group
+they are in. Note that the order is random, and the id is not
+informative about the topic or group.
